@@ -4,19 +4,20 @@ module React
       
     def setup_while_loading(opts, loaded_display_block)
       puts "setting up while_loading"
-      @opts = opts
+      @while_loading_opts = opts || {}
       @loaded_display_block = loaded_display_block
       self
     end
   
     def show(s = nil, &loading_display_block)
       puts "adding the show thing"
-      @opts.merge!(display: s) unless loading_display_block
+      raise "show can only be attached to a while_loading element" unless @while_loading_opts
+      @while_loading_opts.merge!(display: s) unless loading_display_block
       RenderingContext.replace(
         self,
         React.create_element(
           ReactiveRecord::WhileLoading, 
-          @opts.merge({loaded_display_block: @loaded_display_block, loading_display_block: loading_display_block})
+          @while_loading_opts.merge({loaded_display_block: @loaded_display_block, loading_display_block: loading_display_block})
       ))
     end
       
@@ -64,6 +65,7 @@ module ReactiveRecord
     
     def self.loading!
       puts "adding observer for #{current_loading_observer} self = #{self}, WhileLoading = #{WhileLoading}"
+      #React::State.get_state(self, :loaded_at)
       React::State.get_state(self, :loaded_at, current_loading_observer) # will register current observer
     end
 
@@ -76,17 +78,36 @@ module ReactiveRecord
       React::State.will_be_observing?(self, :loaded_at, current_loading_observer) 
     end
     
+    after_mount do
+      puts "while_loading after_mount"
+      WhileLoading.pop_current_loading_observer
+      puts "after while mount #{self} will_be_observing? #{React::State.will_be_observing?(WhileLoading, :loaded_at, self)} showing loaded display: (#{@showing_loaded_display_block})"
+      if React::State.will_be_observing?(WhileLoading, :loaded_at, self) and @showing_loaded_display_block 
+        puts "FORCING UPDATE AFTER MOUNT!!!!!!!!!!"
+        @forced_update = true
+        force_update!
+      end
+    end
+    
+    before_update do
+      WhileLoading.loading! if @forced_update
+    end
+    
     after_update do
-      observer = WhileLoading.pop_current_loading_observer
-      #React::State.update_states_to_observe(observer)
-      puts "after while rendering update: is #{observer}  WhileLoading = #{WhileLoading} is_observing? #{React::State.is_observing?(WhileLoading, :loaded_at, observer)}, will_be_observing? #{React::State.will_be_observing?(self, :loaded_at, observer)} showing loaded display: (#{@showing_loaded_display_block})"
-      force_update! if React::State.is_observing?(WhileLoading, :loaded_at, observer) and @showing_loaded_display_block 
+      WhileLoading.pop_current_loading_observer
+      @forced_update = false
+      puts "after while rendering update #{self} will_be_observing? #{React::State.will_be_observing?(WhileLoading, :loaded_at, self)} showing loaded display: (#{@showing_loaded_display_block})"
+      if React::State.will_be_observing?(WhileLoading, :loaded_at, self) and @showing_loaded_display_block 
+        puts "FORCING UPDATE AFTER RENDER!!!!!!!!!!"
+        @forced_update = true
+        force_update!
+      end
     end
     
     def render
       puts "while rendering"
       WhileLoading.push_current_loading_observer
-      unless WhileLoading.loading? and @showing_loaded_display_block 
+      unless WhileLoading.loading? and @showing_loaded_display_block
         puts "rendering loaded display"
         element = React::RenderingContext.render(nil, &loaded_display_block)
         @showing_loaded_display_block = true

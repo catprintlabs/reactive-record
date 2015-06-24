@@ -194,6 +194,7 @@ DEPENDENCIES
   capybara
   factory_girl_rails
   opal!
+  opal-browser
   opal-react!
   react-rails!
   reactive_record!
