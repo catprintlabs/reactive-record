@@ -5,6 +5,7 @@ end
 if RUBY_ENGINE == 'opal'
   require "reactive_record/cache"
   require "reactive_record/active_record"
+  require "reactive_record/while_loading"
   require "reactive_record/interval"
 else
   require "opal"
