@@ -12,7 +12,7 @@ class TodosMainComponent
   end
   
   def render
-    while_loading do
+    #while_loading do
       div do
         table do
           tr { "name".td; "email".td; "number of todos".td}
@@ -42,8 +42,9 @@ class TodosMainComponent
             end
           end
         end.show("searching...")
-      end
+     # end
     end
+
   end
   
 end

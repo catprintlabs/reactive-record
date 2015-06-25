@@ -1,3 +1,44 @@
+#require 'reactive_record'
+
+module ReactiveRecord
+  
+  class WhileLoading
+    
+    include React::Component
+    
+    required_param :loaded_display_block
+    required_param :loading_display_block
+    optional_param :display, default: ""
+    
+    def self.loading!
+      puts "loading! current_observer: #{React::State.current_observer}"
+      React::State.get_state(self, :loaded_at)
+    end
+
+    def self.loaded_at(loaded_at)
+      React::State.set_state(self, :loaded_at, loaded_at)
+    end
+    
+    def render
+      div(class: :reactive_record_while_loading_container, "data-reactive_record_while_loading_container_id" => object_id) do
+        div(class: :reactive_record_show_loaded_container) do
+          React::RenderingContext.render(nil, &loaded_display_block)
+        end
+        div(class: :reactive_record_show_loading_container) do
+          if loading_display_block
+            React::RenderingContext.render(nil, &loading_display_block)
+          else
+            display.to_s
+          end
+        end
+      end
+    end
+    
+  end
+  
+end
+
+
 module React
   
   class Element
@@ -24,7 +65,55 @@ module React
   end
 
   module Component
-  
+    
+    alias_method :original_component_did_mount, :component_did_mount
+    
+    def component_did_mount(*args)
+      puts "#{self}.component_did_mount"
+      original_component_did_mount(*args)
+      reactive_record_show_loading_or_unloading
+    end
+    
+    alias_method :original_component_did_update, :component_did_update
+    
+    def component_did_update(*args)
+      puts "#{self}.component_did_update"
+      original_component_did_update(*args)
+      reactive_record_show_loading_or_unloading
+    end
+    
+    def reactive_record_show_loading_or_unloading
+      loading = React::State.is_observing?(ReactiveRecord::WhileLoading, :loaded_at, self)
+      node = `#{@native}.getDOMNode()`
+      `if ($(node).hasClass('reactive_record_while_loading_container')) node = $(node).parent()`  unless self.is_a? ReactiveRecord::WhileLoading
+      while_loading_container = `$(node).closest('.reactive_record_while_loading_container')`.first
+      puts "#{self}.after_update loading=(#{loading})"
+      # `debugger` if loading
+      return unless while_loading_container
+      loading_container_id = `$(while_loading_container).attr('data-reactive_record_while_loading_container_id')`
+      if loading
+        `$(node).addClass('reactive_record_'+#{loading_container_id}+'_is_loading')`
+        `$(while_loading_container).children('.reactive_record_show_loaded_container').hide()`
+        `$(while_loading_container).children('.reactive_record_show_loading_container').show()`
+        puts "SHOULD HAVE HIDDEN SOMETHING"
+        # `debugger` 
+        nil
+      else
+        `$(node).removeClass('reactive_record_'+#{loading_container_id}+'_is_loading')`
+        children_loading = `$(while_loading_container).find('.reactive_record_'+#{loading_container_id}+'_is_loading')`
+
+        if children_loading.length > 0
+          puts "SHOULD BE HIDING"
+        else
+          puts "SHOULD BE DISPLAYING"
+        end
+        # `debugger`
+        `$(while_loading_container).children('.reactive_record_show_loaded_container').toggle(!children_loading.length > 0)`
+        `$(while_loading_container).children('.reactive_record_show_loading_container').toggle(children_loading.length > 0)`
+        nil
+      end    
+    end
+      
     def while_loading(opts = {}, &loaded_display_block)
       puts "well I am trying to render this baby"
       RenderingContext.render(
@@ -37,98 +126,3 @@ module React
 
 end
 
-module ReactiveRecord
-  
-  class WhileLoading
-    
-    include React::Component
-    
-    required_param :loaded_display_block
-    required_param :loading_display_block
-    optional_param :display, default: ""
-    
-    def self.current_loading_observer
-      if @current_loading_observers and @current_loading_observers.count > 0
-        @current_loading_observers.last
-      else
-        React::State.current_observer
-      end
-    end
-    
-    def self.push_current_loading_observer
-      (@current_loading_observers ||= []) << current_loading_observer
-    end
-    
-    def self.pop_current_loading_observer
-      @current_loading_observers.pop
-    end
-    
-    def self.loading!
-      puts "adding observer for #{current_loading_observer} self = #{self}, WhileLoading = #{WhileLoading}"
-      #React::State.get_state(self, :loaded_at)
-      React::State.get_state(self, :loaded_at, current_loading_observer) # will register current observer
-    end
-
-    def self.loaded_at(loaded_at)
-      puts "updating loaded_at to #{loaded_at}"
-      React::State.set_state(self, :loaded_at, loaded_at)
-    end
-    
-    def self.loading?
-      React::State.will_be_observing?(self, :loaded_at, current_loading_observer) 
-    end
-    
-    after_mount do
-      puts "while_loading after_mount"
-      WhileLoading.pop_current_loading_observer
-      puts "after while mount #{self} will_be_observing? #{React::State.will_be_observing?(WhileLoading, :loaded_at, self)} showing loaded display: (#{@showing_loaded_display_block})"
-      if React::State.will_be_observing?(WhileLoading, :loaded_at, self) and @showing_loaded_display_block 
-        puts "FORCING UPDATE AFTER MOUNT!!!!!!!!!!"
-        @forced_update = true
-        force_update!
-      end
-    end
-    
-    before_update do
-      WhileLoading.loading! if @forced_update
-    end
-    
-    after_update do
-      WhileLoading.pop_current_loading_observer
-      @forced_update = false
-      puts "after while rendering update #{self} will_be_observing? #{React::State.will_be_observing?(WhileLoading, :loaded_at, self)} showing loaded display: (#{@showing_loaded_display_block})"
-      if React::State.will_be_observing?(WhileLoading, :loaded_at, self) and @showing_loaded_display_block 
-        puts "FORCING UPDATE AFTER RENDER!!!!!!!!!!"
-        @forced_update = true
-        force_update!
-      end
-    end
-    
-    def render
-      puts "while rendering"
-      WhileLoading.push_current_loading_observer
-      unless WhileLoading.loading? and @showing_loaded_display_block
-        puts "rendering loaded display"
-        element = React::RenderingContext.render(nil, &loaded_display_block)
-        @showing_loaded_display_block = true
-      end
-      if WhileLoading.loading? 
-        puts "replacing loaded display with loading display"
-        React::RenderingContext.delete(element)
-        if loading_display_block
-          puts "replacing with block call"
-          element = React::RenderingContext.render(nil, &loading_display_block)
-        else
-          puts "replacing with display value: #{display}"
-          element = display.to_s 
-        end
-        @showing_loaded_display_block = false
-      end
-      puts "returning #{element}"
-      element
-    end
-    
-  end
-  
-end
-  

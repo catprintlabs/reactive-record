@@ -13,7 +13,7 @@ class TodosComponent
   
   after_mount do
     puts "after mount"
-   #  `debugger`
+    # `debugger`
     nil
   end
 
@@ -27,7 +27,7 @@ class TodosComponent
   
   def render
     puts "rendering todos"
-    TodosMainComponent users: users
+    while_loading { TodosMainComponent users: users }
   rescue Exception => e
     puts "exception raised while rendering #{e}"
     div do
