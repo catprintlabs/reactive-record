@@ -13,6 +13,9 @@ module ActiveRecord
         @primary_key = val
       end
       
+      def attr_accessible(*args)
+      end
+      
       def _reactive_record_table
         @table ||= []
       end
@@ -93,7 +96,7 @@ module ActiveRecord
       end
       return @state if @state == :loaded or @state == :not_found
       if @state == :loading and  _reactive_record_pending?
-        React::RenderingContext.element_loading!
+        ReactiveRecord::WhileLoading.loading!
         return :loading
       end
       #puts "resolving #{@vector}"

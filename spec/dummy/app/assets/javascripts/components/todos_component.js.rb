@@ -12,13 +12,13 @@ class TodosComponent
   required_param :users, type: [User]
   
   after_mount do
-    puts "after mount"
+    #puts "after mount"
     # `debugger`
     nil
   end
 
   after_update do
-    puts "after update"
+    #puts "after update"
     if user
       #  `debugger` 
       nil
@@ -26,8 +26,10 @@ class TodosComponent
   end
   
   def render
-    puts "rendering todos"
-    while_loading { TodosMainComponent users: users }
+    div do
+      TodosMainComponent(users: users)
+    end.hide_while_loading
+    
   rescue Exception => e
     puts "exception raised while rendering #{e}"
     div do

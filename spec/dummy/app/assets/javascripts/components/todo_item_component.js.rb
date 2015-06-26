@@ -7,7 +7,6 @@ class TodoItemComponent
   required_param :todo
   
   def render
-    puts "rendering todo item #{todo}"
     div do
       "Title: #{todo.title}".br; "Description #{todo.description}".br; "User #{todo.user.name}"
     end

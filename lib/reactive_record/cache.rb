@@ -33,7 +33,7 @@ module ReactiveRecord
         found
       else
         # we are on the client, and we don't have this model instance, so add it to the queue
-        puts "fetch failed on client: #{klass}, #{find_by}, #{value}, #{associations}"
+        #puts "fetch failed on client: #{klass}, #{find_by}, #{value}, #{associations}"
         WhileLoading.loading! # inform react that the current value is bogus
         #puts "element loading called"
         #React::State.get_state self, :last_fetch_at # this just sets up the current component to watch next_fetch_at
@@ -63,19 +63,19 @@ module ReactiveRecord
     
     def schedule_fetch
       @fetch_scheduled ||= after(1) do
-        puts "starting fetch"
+        #puts "starting fetch"
         # how to get the current mount point???? hardcoding as /reactive_record for now
         last_fetch_at = @last_fetch_at
         HTTP.post("/reactive_record", payload: {pending_fetches: @pending_fetches.uniq}).then do |response| 
-          puts "fetch returned"
+          #puts "fetch returned"
           response.json.each do |klass, models|
             models.each do |id, attributes|
               Object.const_get(klass)._reactive_record_update_table(attributes)
             end
           end
-          puts "updating observers"
+          #puts "updating observers"
           WhileLoading.loaded_at last_fetch_at
-          puts "all done with fetch"
+          #puts "all done with fetch"
         end if @pending_fetches.count > 0
         @pending_fetches = []
         @pending_components = []
