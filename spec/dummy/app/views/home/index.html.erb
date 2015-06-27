@@ -1,1 +1,1 @@
-<%= react_component 'TodosComponent', {users: User.all}, prerender: false %>
+<%= react_component 'TodosComponent', {users: User.all}, prerender: !params[:no_prerender] %>

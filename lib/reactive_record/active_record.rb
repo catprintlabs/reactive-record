@@ -20,14 +20,15 @@ module ActiveRecord
         @table ||= []
       end
       
-      def _reactive_record_table_find(attribute, value)
+      def _reactive_record_table_find(attribute, value, dont_initialize_cache = nil)
+        _reactive_record_cache unless dont_initialize_cache
         #puts "in reactive_record_table_find #{attribute}, #{value}"
         _reactive_record_table.detect { |record| record[attribute].to_s == value.to_s }#.tap { |v| puts "table_find(#{attribute}, #{value}) = #{v}, table = #{_reactive_record_table}"}
       end
       
       def _reactive_record_update_table(record)
         #puts "rr_update_table #{record}, #{primary_key}"
-        if r = _reactive_record_table_find(primary_key, record[primary_key])
+        if r = _reactive_record_table_find(primary_key, record[primary_key], true)
           r.merge! record
         else
           _reactive_record_table << record
@@ -41,17 +42,32 @@ module ActiveRecord
       
     end
     
+    def primary_key
+      self.class.primary_key
+    end
+    
+    def model_name
+      # in reality should return ActiveModel::Name object, blah blah
+      self.class.name
+    end
+    
     def initialize(*args)
+      # can be called from react.js if query result is passed in as a param, so we have to do a little work to convert back from js native
+      # to ruby objects
       args_0_is_native = !args[0].respond_to?(:is_a?) rescue args.count == 1
       #puts "initialize #{args}"
       if args_0_is_native
-        @state = :loaded
-        @record = self.class._reactive_record_update_table(JSON.from_object(args[0]))
-        @vector = [self.class.name, self.class.primary_key, @record[self.class.primary_key]]
-        #puts "my vector = #{@vector}"
+        attributes = JSON.from_object args[0]
+        @vector = [model_name, primary_key, attributes[primary_key]]
+        # if we are on the server do a fetch to make sure we get all the associations as well
+        attributes.merge! Base._reactive_record_cache.fetch(*@vector) if ReactiveRecord::Cache.on_server?
+        @record = self.class._reactive_record_update_table attributes
+        @state = :loaded 
       else
+        # TODO  create new record on client side
         @record = {}
       end
+      nil
     end
     
     def attributes
@@ -66,8 +82,8 @@ module ActiveRecord
     
     def _reactive_record_initialize(attribute, value)
       #puts "_reactive_record_initialize(#{attribute}, #{value})"
-      record = self.class._reactive_record_table_find(attribute, value) # ||
-        #Base._reactive_record_cache.fetch(*[self.class.name, attribute, value])
+      record = self.class._reactive_record_table_find(attribute, value) ||      
+        (ReactiveRecord::Cache.on_server? and Base._reactive_record_cache.fetch(*[model_name, attribute, value]))
       if record
         @record = record
         @state = :loaded
@@ -75,7 +91,7 @@ module ActiveRecord
         @record = {attribute => value}
         #@state = :loading
       end
-      @vector = [self.class.name, attribute, value]
+      @vector = [model_name, attribute, value]
       self
     end
     
@@ -89,6 +105,7 @@ module ActiveRecord
     end
 
     def _reactive_record_check_and_resolve_load_state
+      Base._reactive_record_cache
       #puts "#{self}._reactive_record_check_and_resolve_load_state @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{Base._reactive_record_cache.last_fetch_at}) @vector = #{@vector}"
       unless @state
         _reactive_record_fetch
@@ -122,7 +139,7 @@ module ActiveRecord
     end
     
     def self.find_by(opts = {})
-      #puts "#{self.name}.find_by(#{opts})"
+      puts "#{self.name}.find_by(#{opts})"
       attribute = opts.first.first
       value = opts.first.last
       new._reactive_record_initialize(attribute, value)
@@ -145,16 +162,16 @@ module ActiveRecord
         end
         
         define_method(name) do 
-          #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
+          puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
           _reactive_record_check_and_resolve_load_state
           if @state == :not_found
-            #puts "NOT FOUND!!!!!!!!!!!!!!!!!"
+            puts "NOT FOUND!!!!!!!!!!!!!!!!!"
             nil
           elsif !@state or @state == :loading or !@record.has_key? name 
-            #puts "about to create dummy records #{@vector}"
+            puts "about to create dummy records #{@vector}"
             obj = Object.const_get(class_name).new._reactive_record_initialize_vector(@vector + [name])
             if plural 
-              #puts "fetching associations for [#{@vector}]"
+              puts "fetching associations for [#{@vector}]"
               if @state == :loaded
                 _reactive_record_fetch
               end
@@ -163,10 +180,13 @@ module ActiveRecord
               obj
             end
           elsif (@record[name].is_a? Array and @record[name].first.is_a? Hash) 
+            puts "@record[name].is_a? Array and @record[name].first.is_a? Hash"
             @record[name] = @record[name].collect { |item| Object.const_get(class_name).find(item.first.last)}
           elsif @record[name].is_a? Hash
+            puts "@record[name].is_a? Hash"
             @record[name] = Object.const_get(class_name).find(@record[name].first.last)
           else
+            puts "already to go"
             @record[name]
           end
         end
@@ -184,7 +204,7 @@ module ActiveRecord
     end
 
     def method_missing(name, *args, &block)
-      #puts "#{self}.#{name}(#{args}) (called #{self.class.name} instance method missing)"
+      #puts "#{self}.#{name}(#{args}) (called #{model_name} instance method missing)"
       if args.count == 1 && name =~ /=$/ && !block
         _reactive_record_check_and_resolve_load_state
         @record[name.gsub(/=$/,"")] = args[0]

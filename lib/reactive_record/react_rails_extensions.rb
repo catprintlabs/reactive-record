@@ -10,6 +10,7 @@ module React
       def react_component(name, props = {}, render_options={}, &block)
         puts "I'm using the new react_component render_options = #{render_options}"
         @reactive_record_cache ||= ReactiveRecord::Cache.new
+        initial_while_loading_counter = @reactive_record_cache.while_loading_counter
         if render_options[:prerender]
           if render_options[:prerender].is_a? Hash 
             render_options[:prerender][:context] ||= {}
@@ -23,13 +24,17 @@ module React
           puts "render_options: #{render_options}"
         end
 
-        component_rendering = pre_reactive_record_react_component(name, props, render_options, &block)
-        component_rendering += "\n" +
-          javascript_tag(
+        component_rendering = raw(pre_reactive_record_react_component(name, props, render_options, &block))
+        initial_data_string = if render_options[:prerender]
+          raw(javascript_tag(
+            "if (typeof window.ReactiveRecordInitialWhileLoadingCounter == 'undefined') { window.ReactiveRecordInitialWhileLoadingCounter = #{initial_while_loading_counter} }\n" +
             "if (typeof window.ReactiveRecordInitialData == 'undefined') { window.ReactiveRecordInitialData = {} }\n" +
             "if (typeof jQuery != 'undefined') {jQuery.extend(true, window.ReactiveRecordInitialData, #{@reactive_record_cache.to_json})}"
-          ) if render_options[:prerender]
-        component_rendering
+           )).html_safe 
+        else
+          ""
+        end
+        component_rendering+initial_data_string
       end
     end
   end

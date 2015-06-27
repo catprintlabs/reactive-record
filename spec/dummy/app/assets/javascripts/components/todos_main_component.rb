@@ -13,11 +13,13 @@ class TodosMainComponent
 
   def render
     div do
-      table do
+      table do 
+        tbody do
         tr { "name".td; "email".td; "number of todos".td}
         users.each do |user| 
           tr {user.name.td; user.email.td; user.todo_items.count.td.while_loading("-")  }
         end
+      end
       end
       div do 
         "Todos for ".span

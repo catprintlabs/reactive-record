@@ -10,6 +10,11 @@ class TodosComponent
   
   #optional_param :initial_user_email
   required_param :users, type: [User]
+  #define_state :users
+  
+  before_mount do
+    #users! [User.find_by_id(1), User.find_by_id(2), User.find_by_id(3)]
+  end
   
   after_mount do
     #puts "after mount"

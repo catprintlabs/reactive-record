@@ -22,7 +22,12 @@ module ReactiveRecord
       def loaded_at(loaded_at)
         React::State.set_state(self, :loaded_at, loaded_at)
       end
-
+            
+    end
+        
+    before_mount do
+      @uniq_id = ActiveRecord::Base._reactive_record_cache.get_next_while_loading_counter
+      puts "time: #{Time.now} This is my uniq_id #{@uniq_id}"
     end
     
     after_mount do
@@ -37,7 +42,7 @@ module ReactiveRecord
       #puts "#{self}.render loading: #{loading} waiting_on_resources: #{waiting_on_resources}"
       props = element_props.dup
       props.merge!({
-        "data-reactive_record_while_loading_container_id" => object_id,
+        "data-reactive_record_while_loading_container_id" => @uniq_id,
         "data-reactive_record_while_loading_loaded_children_count" => loaded_children.length
       })
       React.create_element(element_type, props) { loaded_children + loading_children }
@@ -102,10 +107,30 @@ module React
     
     def reactive_record_show_loading_or_unloading
       
-      #puts "show or hide: waiting_on_resources = (#{waiting_on_resources})"
-
-      #loading = React::State.is_observing?(ReactiveRecord::WhileLoading, :loaded_at, self)
       %x{
+        /* needs to be redone with minimal jQuery as follows: 
+        
+          do I have a parent loading container including myself?
+          
+          if i am loading give my container the reactive_record_while_loading_is_loading class
+          if i am not loading check my containers children, and set the loading status based on that
+            
+          the rest is css which just gets shoved in the DOM when the while load is mounted
+          
+            reactive_record_while_loading_is_loading.[data-reactive_record_while_loading_container_id=nnn] > :nth-child(-1n+%{loading_children_count}) {
+              display: none 
+            }
+            reactive_record_while_loading_is_loaded.[data-reactive_record_while_loading_container_id=nnn] > :nth-child(1n+%{loaded_children_count+1}) {
+              display: none 
+            }
+            
+          during mount on the server we send this over to the server to build a preload style sheet:
+
+            [data-reactive_record_while_loading_container_id=nnn] > :nth-child(1n+%{loaded_children_count+1}) {
+              display: none 
+            }
+        */    
+            
         var loading = (#{waiting_on_resources} == true)
         var node = #{@native}.getDOMNode()
         var while_loading_container
@@ -135,6 +160,8 @@ module React
     end
   
   end
+  
+
 
 end
 
