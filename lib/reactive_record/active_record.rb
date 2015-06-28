@@ -40,6 +40,22 @@ module ActiveRecord
         @@reactive_record_cache ||= ReactiveRecord::Cache.new
       end
       
+      def _react_param_conversion(param, opt = nil)
+        param_is_native = !param.respond_to?(:is_a?) rescue true
+        param = JSON.from_object param if param_is_native
+        if param.is_a? self
+          param
+        elsif param.is_a? Hash
+          if opt == :validate_only 
+            true
+          else
+            new(param)
+          end
+        else
+          nil
+        end
+      end
+      
     end
     
     def primary_key
@@ -52,22 +68,16 @@ module ActiveRecord
     end
     
     def initialize(*args)
-      # can be called from react.js if query result is passed in as a param, so we have to do a little work to convert back from js native
-      # to ruby objects
-      args_0_is_native = !args[0].respond_to?(:is_a?) rescue args.count == 1
-      #puts "initialize #{args}"
-      if args_0_is_native
-        attributes = JSON.from_object args[0]
+      if args[0]
+        attributes = args[0]
         @vector = [model_name, primary_key, attributes[primary_key]]
         # if we are on the server do a fetch to make sure we get all the associations as well
         attributes.merge! Base._reactive_record_cache.fetch(*@vector) if ReactiveRecord::Cache.on_server?
         @record = self.class._reactive_record_update_table attributes
         @state = :loaded 
       else
-        # TODO  create new record on client side
         @record = {}
       end
-      nil
     end
     
     def attributes

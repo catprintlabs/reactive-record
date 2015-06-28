@@ -2,13 +2,16 @@
 <html>
 <head>
   <title>Dummy</title>
+
   <%= stylesheet_link_tag    "application", :media => "all" %>
-  <%= javascript_include_tag "application" unless params[:no_js] %>
   <%= csrf_meta_tags %>
+  
 </head>
 <body>
 
-<%= yield %>
+  <%= yield %>
+  
+  <%= javascript_include_tag "application" unless params[:no_js] %>
 
 </body>
 </html>

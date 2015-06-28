@@ -26,10 +26,10 @@ module React
 
         component_rendering = raw(pre_reactive_record_react_component(name, props, render_options, &block))
         initial_data_string = if render_options[:prerender]
-          raw(javascript_tag(
+          raw("<style>\n#{@reactive_record_cache.css_to_preload!}\n</style>\n"+javascript_tag(
             "if (typeof window.ReactiveRecordInitialWhileLoadingCounter == 'undefined') { window.ReactiveRecordInitialWhileLoadingCounter = #{initial_while_loading_counter} }\n" +
-            "if (typeof window.ReactiveRecordInitialData == 'undefined') { window.ReactiveRecordInitialData = {} }\n" +
-            "if (typeof jQuery != 'undefined') {jQuery.extend(true, window.ReactiveRecordInitialData, #{@reactive_record_cache.to_json})}"
+            "if (typeof window.ReactiveRecordInitialData == 'undefined') { window.ReactiveRecordInitialData = [] }\n" +
+            "window.ReactiveRecordInitialData.push(#{@reactive_record_cache.to_json})"
            )).html_safe 
         else
           ""

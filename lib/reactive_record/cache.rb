@@ -8,7 +8,7 @@ module ReactiveRecord
     attr_reader :last_fetch_at
     
     attr_reader :while_loading_counter
-    
+        
     def get_next_while_loading_counter(i)
       if RUBY_ENGINE != 'opal' or `typeof window.ReactiveRecordCache == 'undefined'`
         # we are on the server and have been called by the opal side, or we are the client
@@ -17,11 +17,24 @@ module ReactiveRecord
         # we are on the server on the opal side, so send the message over the ruby side (see previous line)
         `window.ReactiveRecordCache.get_next_while_loading_counter(1)`.to_i
       end
-    end  
+    end
+    
+    def preload_css(css)
+      if RUBY_ENGINE != 'opal'
+        @css_to_preload << css << "\n"
+      elsif `typeof window.ReactiveRecordCache != 'undefined'`
+        `window.ReactiveRecordCache.preload_css(#{css})`
+      end
+    end
+    
+    def css_to_preload!
+      @css_to_preload.tap { @css_to_preload = "" }
+    end
     
     def initialize
       @initial_data = Hash.new {|hash, key| hash[key] = Hash.new}
       @while_loading_counter = 0
+      @css_to_preload = ""
       if RUBY_ENGINE == 'opal' and `typeof window.ReactiveRecordCache == 'undefined'`
         # we are running on the client 
         require 'opal-jquery'
@@ -29,9 +42,11 @@ module ReactiveRecord
         @while_loading_counter = `ReactiveRecordInitialWhileLoadingCounter` rescue 0
         @pending_fetches = []
         @last_fetch_at = Time.now
-        JSON.from_object(`ReactiveRecordInitialData`).each do |klass, models|
-          puts "got #{klass} and #{models}"
-          models.each { |key, value| Object.const_get(klass)._reactive_record_update_table(value) }
+        JSON.from_object(`ReactiveRecordInitialData`).each do |collection|
+          collection.each do |klass, models|
+            puts "got #{klass} and #{models}"
+            models.each { |key, value| Object.const_get(klass)._reactive_record_update_table(value) }
+          end
         end if `typeof ReactiveRecordInitialData != 'undefined'`
       else
         puts "hey not running on client"
