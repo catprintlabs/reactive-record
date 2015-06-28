@@ -16,7 +16,7 @@ class TodosMainComponent
       if true
       table do 
         tbody do
-          tr { "name".td; "email".td; "number of todos".td}
+          tr { td {"name"}; td {"email"}; td {"number of todos"}}
           users.each do |user| 
             tr {user.name.td; user.email.td; user.todo_items.count.td.while_loading("-")  }
           end
