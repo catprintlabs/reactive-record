@@ -8,7 +8,6 @@ module React
       alias_method :pre_reactive_record_react_component, :react_component
 
       def react_component(name, props = {}, render_options={}, &block)
-        puts "I'm using the new react_component render_options = #{render_options}"
         @reactive_record_cache ||= ReactiveRecord::Cache.new
         initial_while_loading_counter = @reactive_record_cache.while_loading_counter
         if render_options[:prerender]
@@ -21,7 +20,6 @@ module React
           end
 
           render_options[:prerender][:context].merge!({"ReactiveRecordCache" => @reactive_record_cache})
-          puts "render_options: #{render_options}"
         end
 
         component_rendering = raw(pre_reactive_record_react_component(name, props, render_options, &block))

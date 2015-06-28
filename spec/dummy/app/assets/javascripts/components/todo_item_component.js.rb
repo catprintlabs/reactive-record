@@ -8,12 +8,8 @@ class TodoItemComponent
   
   def render
     div do
+      blam!
       "Title: #{todo.title}".br; "Description #{todo.description}".br; "User #{todo.user.name}"
-    end
-  rescue Exception => e
-    div do
-      "errorzzz: #{e.message}".br
-      e.backtrace.each { |line| line.br }
     end
   end
   

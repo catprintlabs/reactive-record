@@ -149,7 +149,7 @@ module ActiveRecord
     end
     
     def self.find_by(opts = {})
-      puts "#{self.name}.find_by(#{opts})"
+      #puts "#{self.name}.find_by(#{opts})"
       attribute = opts.first.first
       value = opts.first.last
       new._reactive_record_initialize(attribute, value)
@@ -172,16 +172,16 @@ module ActiveRecord
         end
         
         define_method(name) do 
-          puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
+          #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
           _reactive_record_check_and_resolve_load_state
           if @state == :not_found
-            puts "NOT FOUND!!!!!!!!!!!!!!!!!"
+            puts "NOT FOUND "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}""
             nil
           elsif !@state or @state == :loading or !@record.has_key? name 
-            puts "about to create dummy records #{@vector}"
+            #puts "about to create dummy records #{@vector}"
             obj = Object.const_get(class_name).new._reactive_record_initialize_vector(@vector + [name])
             if plural 
-              puts "fetching associations for [#{@vector}]"
+              #puts "fetching associations for [#{@vector}]"
               if @state == :loaded
                 _reactive_record_fetch
               end
@@ -190,13 +190,13 @@ module ActiveRecord
               obj
             end
           elsif (@record[name].is_a? Array and @record[name].first.is_a? Hash) 
-            puts "@record[name].is_a? Array and @record[name].first.is_a? Hash"
+            #puts "@record[name].is_a? Array and @record[name].first.is_a? Hash"
             @record[name] = @record[name].collect { |item| Object.const_get(class_name).find(item.first.last)}
           elsif @record[name].is_a? Hash
-            puts "@record[name].is_a? Hash"
+            #puts "@record[name].is_a? Hash"
             @record[name] = Object.const_get(class_name).find(@record[name].first.last)
           else
-            puts "already to go"
+            #puts "already to go"
             @record[name]
           end
         end

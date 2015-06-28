@@ -60,7 +60,7 @@ module ReactiveRecord
     end
     
     def render
-      puts "#{self}.render loading: #{loading} waiting_on_resources: #{waiting_on_resources}"
+      #puts "#{self}.render loading: #{loading} waiting_on_resources: #{waiting_on_resources}"
       props = element_props.dup
       classes = [props[:class], props[:className], "reactive_record_while_loading_container_#{@uniq_id}"].compact.join(" ")
       props.merge!({

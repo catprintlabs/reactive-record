@@ -38,18 +38,18 @@ module ReactiveRecord
       if RUBY_ENGINE == 'opal' and `typeof window.ReactiveRecordCache == 'undefined'`
         # we are running on the client 
         require 'opal-jquery'
-        puts "running on the client"
+        #puts "running on the client"
         @while_loading_counter = `ReactiveRecordInitialWhileLoadingCounter` rescue 0
         @pending_fetches = []
         @last_fetch_at = Time.now
         JSON.from_object(`ReactiveRecordInitialData`).each do |collection|
           collection.each do |klass, models|
-            puts "got #{klass} and #{models}"
+            #puts "got #{klass} and #{models}"
             models.each { |key, value| Object.const_get(klass)._reactive_record_update_table(value) }
           end
         end if `typeof ReactiveRecordInitialData != 'undefined'`
       else
-        puts "hey not running on client"
+        #puts "hey not running on client"
       end
     end
     
@@ -67,11 +67,11 @@ module ReactiveRecord
         JSON.parse `window.ReactiveRecordCache.fetch(#{klass}, #{find_by}, #{value})`
       elsif attributes = @initial_data[klass][[find_by, value.to_s]]
         # we are on the client, and the data was sent down in the initial data set
-        puts "fetch found data in initial data: #{klass}, #{find_by}, #{value} = #{attributes}"
+        #puts "fetch found data in initial data: #{klass}, #{find_by}, #{value} = #{attributes}"
         attributes
       else
         # we are on the client, and we don't have this model instance, so add it to the queue
-        puts "fetch failed on client: #{klass}, #{find_by}, #{value}, #{associations}"
+        #puts "fetch failed on client: #{klass}, #{find_by}, #{value}, #{associations}"
         WhileLoading.loading! # inform react that the current value is bogus
         #puts "element loading called"
         #React::State.get_state self, :last_fetch_at # this just sets up the current component to watch next_fetch_at
@@ -100,30 +100,30 @@ module ReactiveRecord
     end
     
     def schedule_fetch
-      puts "start of fetch"
+      #puts "start of fetch"
       @fetch_scheduled ||= after(1) do
-        puts "starting fetch"
+        #puts "starting fetch"
         # how to get the current mount point???? hardcoding as /reactive_record for now
         last_fetch_at = @last_fetch_at
         HTTP.post("/reactive_record", payload: {pending_fetches: @pending_fetches.uniq}).then do |response| 
-          puts "fetch returned"
+          #puts "fetch returned"
           response.json.each do |klass, models|
             models.each do |id, attributes|
               Object.const_get(klass)._reactive_record_update_table(attributes)
             end
           end
-          puts "updating observers"
+          #puts "updating observers"
           WhileLoading.loaded_at last_fetch_at
-          puts "all done with fetch"
+          #puts "all done with fetch"
         end if @pending_fetches.count > 0
         @pending_fetches = []
         @pending_components = []
         @last_fetch_at = Time.now
         @fetch_scheduled = nil
       end
-      puts "end of fetch"
+      #puts "end of fetch"
     rescue Exception => e
-      puts e.message
+      puts "schdule_fetch Execption #{e.message}"
     end
     
   end

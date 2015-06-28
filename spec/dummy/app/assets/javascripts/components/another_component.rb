@@ -7,17 +7,18 @@ class AnotherComponent
   
   required_param :user, type: User
   
+  full_backtrace :on
+  
   def render
     div do
       "#{user.name}'s todos:".br
       ul do
+        broken!
         user.todo_items.each do |todo|
           li { TodoItemComponent(todo: todo) }
         end
       end
     end
-  rescue Exception => e
-    puts "exception #{e}"
   end
   
 end

@@ -34,13 +34,6 @@ class TodosComponent
     div do
       TodosMainComponent(users: users)
     end.hide_while_loading
-    
-  rescue Exception => e
-    puts "exception raised while rendering #{e}"
-    div do
-      "error: #{e.message}".br
-      e.backtrace.each { |line| line.br }
-    end
   end
   
 end
