@@ -12,8 +12,8 @@ else
   require "reactive_record/version"
   require "reactive_record/engine"
   require "reactive_record/react_rails_extensions"
-  require "../../config/routes.rb"
-  require "../../app/controllers/reactive_record/reactive_record_controller"
+  #require "../../config/routes.rb"
+  #require "../../app/controllers/reactive_record/reactive_record_controller"
 
   Opal.append_path File.expand_path('../', __FILE__).untaint
   Opal.append_path File.expand_path('../../vendor', __FILE__).untaint
