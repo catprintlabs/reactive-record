@@ -83,7 +83,8 @@ module ReactiveRecord
         nil
       end
     rescue Exception => e
-      puts "fetch exception #{RUBY_ENGINE}fetch(#{klass}, #{id}, #{associations}) #{e}"
+      puts "fetch exception #{RUBY_ENGINE} fetch(#{klass}, #{find_by}, #{value}, #{associations}) #{e}"
+      raise e
     end
     
     def get_scope(klass, scope)
@@ -95,9 +96,23 @@ module ReactiveRecord
       @initial_data.tap { @initial_data = Hash.new {|hash, key| hash[key] = Hash.new} } unless RUBY_ENGINE == 'opal'
     end
     
-    def self.build_json_hash(record)
-      record.as_json root: nil, include: Hash[*record.class.reflect_on_all_associations.collect { |assoc| [assoc.name, {only: :id}]}.flatten]
+    if RUBY_ENGINE != 'opal'
+      
+      def self.build_json_include_hash(record)
+        Hash[
+          *record.class.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }.flatten,
+          *record.class.reflect_on_all_associations.collect do |assoc| 
+            [assoc.name, {only: :id, include: Hash[assoc.klass.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }]}] 
+          end.flatten
+        ]
+      end
+    
+      def self.build_json_hash(record)
+        record.as_json root: nil, include: build_json_include_hash(record)
+      end
+      
     end
+    
     
     def schedule_fetch
       #puts "start of fetch"

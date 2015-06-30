@@ -86,7 +86,6 @@ module ActiveRecord
     
     def _reactive_record_initialize_vector(vector)
       @vector = vector
-      # Base._reactive_record_cache.fetch(*vector)
       self
     end
     
@@ -117,6 +116,7 @@ module ActiveRecord
     def _reactive_record_check_and_resolve_load_state
       Base._reactive_record_cache
       #puts "#{self}._reactive_record_check_and_resolve_load_state @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{Base._reactive_record_cache.last_fetch_at}) @vector = #{@vector}"
+      return unless @vector # happens if a new active record model is created by the application 
       unless @state
         _reactive_record_fetch
         return (@state = :loading)
@@ -133,7 +133,7 @@ module ActiveRecord
       loaded_model = @vector[3..-1].inject(root_model) do |model, association|
         #puts "resolving: #{model}, #{association}"
         return (@state = :not_found) unless model
-        value = model.send(association)
+        value = model[association] # how did this ever possibly work ->>>>> value = model.send(association)
         if value.is_a? Array 
           if value.count > 0
             value.first
@@ -159,17 +159,77 @@ module ActiveRecord
       find_by(primary_key => id)
     end
     
-    {belongs_to: nil, has_many: true}.each do |method_name, plural|
+    def self.table_name=(name)
+    end
+    
+    def self.abstract_class=(name)
+    end
+    
+    def self.scope(*args, &block)
+    end
+    
+    def self.before_validation(*args, &block)
+    end
+    
+    def self.with_options(*args, &block)
+    end
+
+    def self.validates_presence_of(*args, &block)
+    end
+    
+    def self.validates_format_of(*args, &block)
+    end
+
+    def self.accepts_nested_attributes_for(*args, &block)
+    end 
+
+    def self.after_create(*args, &block)
+    end
+    
+    def self.before_save(*args, &block)
+    end
+    
+    def self.before_destroy(*args, &block)
+    end
+    
+    def self.where(*args, &block)
+    end
+    
+    def self.validate(*args, &block)
+    end
+    
+    def self.attr_protected(*args, &block)
+    end
+    
+    def self.validates_numericality_of(*args, &block)
+    end
+    
+    def self.default_scope(*args, &block)
+    end
+    
+    def self.serialize(*args, &block)
+    end
+    
+    def self.has_attached_file(*args, &block)
+    end
+    
+    class DummyAggregate
+      
+      def method_missing(*args, &block)
+        DummyAggregate.new
+      end 
+      
+      def to_s
+        ""
+      end  
+      
+    end  
+      
+    {belongs_to: :singular, has_many: :plural, has_one: :singular, composed_of: :aggregate}.each do |method_name, assoc_type|
       
       self.class.define_method(method_name) do |name, options = {}|
         
-        class_name = if options[:class_name]
-          options[:class_name]
-        elsif plural
-          name.camelize.gsub(/s$/,"")
-        else
-          name.camelize
-        end
+        klass = Object.const_get options[:class_name] || (assoc_type == :plural && name.camelize.gsub(/s$/,"")) || name.camelize
         
         define_method(name) do 
           #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
@@ -179,25 +239,26 @@ module ActiveRecord
             nil
           elsif !@state or @state == :loading or !@record.has_key? name 
             #puts "about to create dummy records #{@vector}"
-            obj = Object.const_get(class_name).new._reactive_record_initialize_vector(@vector + [name])
-            if plural 
-              #puts "fetching associations for [#{@vector}]"
-              if @state == :loaded
-                _reactive_record_fetch
-              end
-              [obj]
-            else
-              obj
+            _reactive_record_fetch if [:aggregate, :plural].include? assoc_type and @state == :loaded
+            if assoc_type == :aggregate
+              DummyAggregate.new
+            elsif assoc_type == :plural
+              [klass.new._reactive_record_initialize_vector(@vector + [name])]
+            else 
+              klass.new._reactive_record_initialize_vector(@vector + [name])
             end
+          elsif @record[name].is_a? klass
+            @record[name]
+          elsif assoc_type == :aggregate
+            @record[name] = klass.send(options[:constructor] || :new, *options[:mapping].collect { |mapping|  @record[name][mapping.last] })
           elsif (@record[name].is_a? Array and @record[name].first.is_a? Hash) 
             #puts "@record[name].is_a? Array and @record[name].first.is_a? Hash"
-            @record[name] = @record[name].collect { |item| Object.const_get(class_name).find(item.first.last)}
+            @record[name] = @record[name].collect { |item| klass.find(item.first.last)}
           elsif @record[name].is_a? Hash
             #puts "@record[name].is_a? Hash"
-            @record[name] = Object.const_get(class_name).find(@record[name].first.last)
+            @record[name] = klass.find(@record[name].first.last)
           else
-            #puts "already to go"
-            @record[name]
+            raise "ReactiveRecord internal error - #{association_type} association data for #{name} not of correct type: #{@record[name]}"
           end
         end
         
@@ -214,7 +275,7 @@ module ActiveRecord
     end
 
     def method_missing(name, *args, &block)
-      #puts "#{self}.#{name}(#{args}) (called #{model_name} instance method missing)"
+      #puts "#{self}.#{name}(#{args})" # (called #{model_name} instance method missing)"
       if args.count == 1 && name =~ /=$/ && !block
         _reactive_record_check_and_resolve_load_state
         @record[name.gsub(/=$/,"")] = args[0]
