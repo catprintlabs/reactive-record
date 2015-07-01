@@ -8,7 +8,7 @@ module React
       alias_method :pre_reactive_record_react_component, :react_component
 
       def react_component(name, props = {}, render_options={}, &block)
-        @reactive_record_cache ||= ReactiveRecord::Cache.new
+        @reactive_record_cache ||= ReactiveRecord::Cache.new(self)
         initial_while_loading_counter = @reactive_record_cache.while_loading_counter
         if render_options[:prerender]
           if render_options[:prerender].is_a? Hash 

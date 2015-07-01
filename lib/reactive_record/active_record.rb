@@ -70,6 +70,16 @@ module ActiveRecord
     def initialize(*args)
       if args[0]
         attributes = args[0]
+        self.class._reactive_record_associations.each do | attribute, klass_name | 
+          if attributes[attribute]
+            klass = Object.const_get klass_name
+            attributes[attribute] = if attributes[attribute].is_a? Array
+              attributes[attribute].collect { |r| klass.new(r) }
+            else
+              klass.new(attributes[attribute])
+            end
+          end
+        end
         @vector = [model_name, primary_key, attributes[primary_key]]
         # if we are on the server do a fetch to make sure we get all the associations as well
         attributes.merge! Base._reactive_record_cache.fetch(*@vector) if ReactiveRecord::Cache.on_server?
@@ -224,14 +234,19 @@ module ActiveRecord
       end  
       
     end  
+    
+    def self._reactive_record_associations
+      @associations ||= {}
+    end
       
     {belongs_to: :singular, has_many: :plural, has_one: :singular, composed_of: :aggregate}.each do |method_name, assoc_type|
       
       self.class.define_method(method_name) do |name, options = {}|
         
-        klass = Object.const_get options[:class_name] || (assoc_type == :plural && name.camelize.gsub(/s$/,"")) || name.camelize
-        
+        klass_name = options[:class_name] || (assoc_type == :plural && name.camelize.gsub(/s$/,"")) || name.camelize
+        _reactive_record_associations[name] = klass_name unless assoc_type == :aggregate
         define_method(name) do 
+          klass = Object.const_get klass_name
           #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
           _reactive_record_check_and_resolve_load_state
           if @state == :not_found
@@ -247,7 +262,7 @@ module ActiveRecord
             else 
               klass.new._reactive_record_initialize_vector(@vector + [name])
             end
-          elsif @record[name].is_a? klass
+          elsif @record[name].is_a? klass or (@record[name].is_a? Array and @record[name].first.is_a? klass)
             @record[name]
           elsif assoc_type == :aggregate
             @record[name] = klass.send(options[:constructor] || :new, *options[:mapping].collect { |mapping|  @record[name][mapping.last] })

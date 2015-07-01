@@ -1,7 +1,41 @@
 require 'json'
 
-
 module ReactiveRecord
+  
+  def self.load(&block)
+    promise = Promise.new
+    @load_stack ||= []
+    @load_stack << @loads_pending
+    @loads_pending = nil
+    block.call
+    if @loads_pending
+      @blocks_to_load ||= []
+      @blocks_to_load << [promise, block]
+    else
+      promise.resolve
+    end
+    @loads_pending = @load_stack.pop
+    promise
+  end
+  
+  def self._load_pending!
+    @loads_pending = true
+  end
+  
+  def self._run_blocks_to_load
+    if @blocks_to_load
+      @blocks_to_load = @blocks_to_load.collect do |promise_and_block|
+        @loads_pending = nil
+        block.call
+        if @loads_pending
+          promise_and_block
+        else
+          promise.resolve
+          nil
+        end
+      end.compact
+    end
+  end
   
   class Cache
     
@@ -31,7 +65,16 @@ module ReactiveRecord
       @css_to_preload.tap { @css_to_preload = "" }
     end
     
-    def initialize
+    def cookie(name)
+      if RUBY_ENGINE != 'opal'
+        @controller.send(:cookies)[name]
+      elsif `typeof window.ReactiveRecordCache != 'undefined'`
+        `window.ReactiveRecordCache.cookie(#{name})`
+      end
+    end
+    
+    def initialize(controller = nil)
+      @controller = controller
       @initial_data = Hash.new {|hash, key| hash[key] = Hash.new}
       @while_loading_counter = 0
       @css_to_preload = ""
@@ -72,6 +115,7 @@ module ReactiveRecord
       else
         # we are on the client, and we don't have this model instance, so add it to the queue
         #puts "fetch failed on client: #{klass}, #{find_by}, #{value}, #{associations}"
+        ReactiveRecord._load_pending!
         WhileLoading.loading! # inform react that the current value is bogus
         #puts "element loading called"
         #React::State.get_state self, :last_fetch_at # this just sets up the current component to watch next_fetch_at
@@ -128,6 +172,7 @@ module ReactiveRecord
             end
           end
           #puts "updating observers"
+          ReactiveRecord._run_blocks_to_load
           WhileLoading.loaded_at last_fetch_at
           #puts "all done with fetch"
         end if @pending_fetches.count > 0
