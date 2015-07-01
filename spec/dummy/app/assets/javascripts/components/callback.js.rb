@@ -12,7 +12,6 @@ class Callback
   
   def render
     div do
-      span { "I'm in the div: and I too can create a cache #{ReactiveRecord::Cache.new}"}
       span { `window.test_context.hello(#{tell_me})` }
       br
       span { "find('TestModel', #{id}) returns: "}

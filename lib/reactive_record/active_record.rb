@@ -21,7 +21,11 @@ module ActiveRecord
       end
       
       def _reactive_record_table_find(attribute, value, dont_initialize_cache = nil)
-        _reactive_record_cache unless dont_initialize_cache
+        unless @load_started 
+          # protects this from recursive loading since _reactive_record_table_find is called from PrerenderDataInterface#initialize
+          @load_started = true
+          React::PrerenderDataInterface.load! 
+        end
         #puts "in reactive_record_table_find #{attribute}, #{value}"
         _reactive_record_table.detect { |record| record[attribute].to_s == value.to_s }#.tap { |v| puts "table_find(#{attribute}, #{value}) = #{v}, table = #{_reactive_record_table}"}
       end
@@ -34,10 +38,6 @@ module ActiveRecord
           _reactive_record_table << record
           record
         end
-      end
-      
-      def _reactive_record_cache
-        @@reactive_record_cache ||= ReactiveRecord::Cache.new
       end
       
       def _react_param_conversion(param, opt = nil)
@@ -82,7 +82,7 @@ module ActiveRecord
         end
         @vector = [model_name, primary_key, attributes[primary_key]]
         # if we are on the server do a fetch to make sure we get all the associations as well
-        attributes.merge! Base._reactive_record_cache.fetch(*@vector) if ReactiveRecord::Cache.on_server?
+        attributes.merge! React::PrerenderDataInterface.fetch(*@vector) if React::PrerenderDataInterface.on_opal_server?
         @record = self.class._reactive_record_update_table attributes
         @state = :loaded 
       else
@@ -102,7 +102,7 @@ module ActiveRecord
     def _reactive_record_initialize(attribute, value)
       #puts "_reactive_record_initialize(#{attribute}, #{value})"
       record = self.class._reactive_record_table_find(attribute, value) ||      
-        (ReactiveRecord::Cache.on_server? and Base._reactive_record_cache.fetch(*[model_name, attribute, value]))
+        (React::PrerenderDataInterface.on_opal_server? and React::PrerenderDataInterface.fetch(*[model_name, attribute, value]))
       if record
         @record = record
         @state = :loaded
@@ -116,16 +116,16 @@ module ActiveRecord
     
     def _reactive_record_fetch
       @fetched_at = Time.now
-      Base._reactive_record_cache.fetch(*@vector)
+      React::PrerenderDataInterface.fetch(*@vector)
     end
     
     def _reactive_record_pending?
-      (@fetched_at || Time.now) > Base._reactive_record_cache.last_fetch_at 
+      (@fetched_at || Time.now) > React::PrerenderDataInterface.last_fetch_at 
     end
 
     def _reactive_record_check_and_resolve_load_state
-      Base._reactive_record_cache
-      #puts "#{self}._reactive_record_check_and_resolve_load_state @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{Base._reactive_record_cache.last_fetch_at}) @vector = #{@vector}"
+      React::PrerenderDataInterface.load!
+      #puts "#{self}._reactive_record_check_and_resolve_load_state @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{React::PrerenderDataInterface.last_fetch_at}) @vector = #{@vector}"
       return unless @vector # happens if a new active record model is created by the application 
       unless @state
         _reactive_record_fetch
@@ -133,7 +133,7 @@ module ActiveRecord
       end
       return @state if @state == :loaded or @state == :not_found
       if @state == :loading and  _reactive_record_pending?
-        ReactiveRecord::WhileLoading.loading!
+        React::WhileLoading.loading!
         return :loading
       end
       #puts "resolving #{@vector}"
@@ -262,7 +262,7 @@ module ActiveRecord
             else 
               klass.new._reactive_record_initialize_vector(@vector + [name])
             end
-          elsif @record[name].is_a? klass or (@record[name].is_a? Array and @record[name].first.is_a? klass)
+          elsif @record[name].is_a? klass or (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.is_a? klass))
             @record[name]
           elsif assoc_type == :aggregate
             @record[name] = klass.send(options[:constructor] || :new, *options[:mapping].collect { |mapping|  @record[name][mapping.last] })

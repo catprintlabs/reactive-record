@@ -7,7 +7,7 @@ class AnotherComponent
   
   required_param :user, type: User
   
-  full_backtrace :on
+  backtrace :on
   
   def render
     div do

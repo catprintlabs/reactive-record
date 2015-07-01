@@ -13,6 +13,8 @@ class TodosComponent
   #define_state :users
   
   before_mount do
+    # `debugger`
+    nil
     #users! [User.find_by_id(1), User.find_by_id(2), User.find_by_id(3)]
   end
   
@@ -21,6 +23,8 @@ class TodosComponent
     # `debugger`
     nil
   end
+  
+  backtrace :on
 
   after_update do
     #puts "after update"

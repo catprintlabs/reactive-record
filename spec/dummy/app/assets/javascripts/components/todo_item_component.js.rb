@@ -5,6 +5,7 @@ class TodoItemComponent
   include React::Component
     
   required_param :todo
+  backtrace :on
   
   def render
     div do     
