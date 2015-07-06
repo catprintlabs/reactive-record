@@ -78,7 +78,9 @@ module React
       def generate_next_footer
         json = @initial_data.to_json
         @initial_data = Hash.new {|hash, key| hash[key] = Hash.new}
+        path = ::Rails.application.routes.routes.detect { |route| route.app == ReactiveRecord::Engine }.path.spec
         pre_reactive_record_generate_next_footer + ("<script type='text/javascript'>\n"+
+          "window.ReactiveRecordEnginePath = '#{path}';\n"+
           "if (typeof window.ClientSidePrerenderDataInterface.ReactiveRecordInitialData === 'undefined') { window.ClientSidePrerenderDataInterface.ReactiveRecordInitialData = [] }\n" +
           "window.ClientSidePrerenderDataInterface.ReactiveRecordInitialData.push(#{json})\n"+
           "</script>\n"
@@ -89,11 +91,10 @@ module React
 
     def schedule_fetch
       #puts "start of fetch"
-      @fetch_scheduled ||= after(1) do
+      @fetch_scheduled ||= after(0.001) do
         #puts "starting fetch"
-        # how to get the current mount point???? hardcoding as /reactive_record for now
         last_fetch_at = @last_fetch_at
-        HTTP.post("/reactive_record", payload: {pending_fetches: @pending_fetches.uniq}).then do |response| 
+        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response| 
           #puts "fetch returned"
           response.json.each do |klass, models|
             models.each do |id, attributes|
@@ -134,7 +135,7 @@ module ReactiveRecord
     end
 
     def self.build_json_hash(record)
-      record.as_json root: nil, include: build_json_include_hash(record)
+      record.serializable_hash include: build_json_include_hash(record)
     end
 
   end
