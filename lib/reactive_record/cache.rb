@@ -35,9 +35,10 @@ module React
       if RUBY_ENGINE != 'opal'
         # we are on the server and have been called by the opal side, so call the actual model
         #Object.const_get(klass).send("find_by_#{find_by}", value).tap { |model|  @initial_data[klass][[find_by, value.to_s]] = ReactiveRecord.build_json_hash(model) }.to_json
-        ReactiveRecord.build_json_hash(Object.const_get(klass).send("find_by_#{find_by}", value)).tap { |model| @initial_data[klass][[find_by, value.to_s]] = model }.to_json
+        ReactiveRecord.build_json_hash(klass.camelize.constantize.send("find_by_#{find_by}", value)).tap { |model| @initial_data[klass][[find_by, value.to_s]] = model }.to_json
       elsif React::PrerenderDataInterface.on_opal_server?
         # we are on the server on the opal side, so send the message over the ruby side (see previous line)
+        puts "on server side fetch(#{klass}, #{find_by}, #{value}, #{associations})"
         JSON.parse `window.ServerSidePrerenderDataInterface.fetch(#{klass}, #{find_by}, #{value})`
       elsif attributes = @initial_data[klass][[find_by, value.to_s]]
         # we are on the client, and the data was sent down in the initial data set
@@ -129,7 +130,7 @@ module ReactiveRecord
       Hash[
         *record.class.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }.flatten,
         *record.class.reflect_on_all_associations.collect do |assoc| 
-          [assoc.name, {only: :id, include: Hash[assoc.klass.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }]}] 
+          [assoc.name, {only: :id, include: Hash[assoc.class_name.camelize.constantize.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }]}] 
         end.flatten
       ]
     end
