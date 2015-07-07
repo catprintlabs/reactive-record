@@ -140,8 +140,11 @@ module ReactiveRecord
       Hash[
         *record.class.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }.flatten,
         *record.class.reflect_on_all_associations.collect do |assoc| 
-          [assoc.name, {only: :id, include: Hash[assoc.class_name.camelize.constantize.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }]}] 
-        end.flatten
+          [
+            assoc.name, 
+            {only: :id, include: Hash[assoc.class_name.camelize.constantize.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}]}]}
+          ] unless assoc.options[:server_only]
+        end.compact.flatten
       ]
     end
 
