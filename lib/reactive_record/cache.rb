@@ -38,7 +38,7 @@ module React
         ReactiveRecord.build_json_hash(klass.camelize.constantize.send("find_by_#{find_by}", value)).tap { |model| @initial_data[klass][[find_by, value.to_s]] = model }.to_json
       elsif React::PrerenderDataInterface.on_opal_server?
         # we are on the server on the opal side, so send the message over the ruby side (see previous line)
-        puts "on server side fetch(#{klass}, #{find_by}, #{value}, #{associations})"
+        #puts "on server side fetch(#{klass}, #{find_by}, #{value}, #{associations})"
         JSON.parse `window.ServerSidePrerenderDataInterface.fetch(#{klass}, #{find_by}, #{value})`
       elsif attributes = @initial_data[klass][[find_by, value.to_s]]
         # we are on the client, and the data was sent down in the initial data set
@@ -99,7 +99,13 @@ module React
           #puts "fetch returned"
           response.json.each do |klass, models|
             models.each do |id, attributes|
-              Object.const_get(klass)._reactive_record_update_table(attributes)
+              model = Object.const_get(klass) rescue nil
+              if model
+                model._reactive_record_update_table(attributes)
+              else
+                message = "Server returned unknown model: #{klass}."
+                `console.error(#{message})`
+              end 
             end
           end
           #puts "updating observers"
@@ -114,7 +120,7 @@ module React
       end
       #puts "end of fetch"
     rescue Exception => e
-      puts "schdule_fetch Execption #{e.message}"
+      puts "schedule_fetch Execption #{e.message}"
     end
     
   end
@@ -125,6 +131,10 @@ end
 module ReactiveRecord
   
   if RUBY_ENGINE != 'opal'
+    
+    def self.get_type_hash(record)
+      {record.class.inheritance_column => record[record.class.inheritance_column]}
+    end
 
     def self.build_json_include_hash(record)
       Hash[
@@ -136,7 +146,7 @@ module ReactiveRecord
     end
 
     def self.build_json_hash(record)
-      record.serializable_hash include: build_json_include_hash(record)
+      record.serializable_hash(include: build_json_include_hash(record)).merge(get_type_hash(record))
     end
 
   end

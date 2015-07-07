@@ -1,63 +1,97 @@
 module ActiveRecord
   class Base    
-    
+ 
+=begin   
     class << self
       
       # this section could be replaced with an interface to something like js-sql-lite
       
+      def base_class
+        
+        unless self < Base
+          raise ActiveRecordError, "#{name} doesn't belong in a hierarchy descending from ActiveRecord"
+        end
+
+        if superclass == Base || superclass.abstract_class?
+          self
+        else
+          superclass.base_class
+        end
+        
+      end
+      
+      def abstract_class?
+        defined?(@abstract_class) && @abstract_class == true
+      end
+      
       def primary_key
-        @primary_key || :id
+        base_class.eval { @primary_key || :id }
       end
       
       def primary_key=(val)
-        @primary_key = val
+       base_class.eval { @primary_key = val }
       end
       
       def attr_accessible(*args)
+        base_class.eval { }
       end
       
       def _reactive_record_table
-        @table ||= []
+        base_class.eval { @table ||= [] }
       end
       
       def _reactive_record_table_find(attribute, value, dont_initialize_cache = nil)
-        unless @load_started 
-          # protects this from recursive loading since _reactive_record_table_find is called from PrerenderDataInterface#initialize
-          @load_started = true
-          React::PrerenderDataInterface.load! 
+        base_class.eval do
+          unless @load_started 
+            # protects this from recursive loading since _reactive_record_table_find is called from PrerenderDataInterface#initialize
+            @load_started = true
+            React::PrerenderDataInterface.load! 
+          end
+          #puts "in reactive_record_table_find #{attribute}, #{value}"
+          _reactive_record_table.detect { |record| record[attribute].to_s == value.to_s }#.tap { |v| puts "table_find(#{attribute}, #{value}) = #{v}, table = #{_reactive_record_table}"}
         end
-        #puts "in reactive_record_table_find #{attribute}, #{value}"
-        _reactive_record_table.detect { |record| record[attribute].to_s == value.to_s }#.tap { |v| puts "table_find(#{attribute}, #{value}) = #{v}, table = #{_reactive_record_table}"}
       end
       
       def _reactive_record_update_table(record)
-        #puts "rr_update_table #{record}, #{primary_key}"
-        if r = _reactive_record_table_find(primary_key, record[primary_key], true)
-          r.merge! record
-        else
-          _reactive_record_table << record
-          record
+        base_class.eval do
+          #puts "rr_update_table"  #{record}, #{primary_key}"
+          if r = _reactive_record_table_find(primary_key, record[primary_key], true)
+            r.merge! record
+          else
+            _reactive_record_table << record
+            record
+          end
         end
       end
       
       def _react_param_conversion(param, opt = nil)
-        param_is_native = !param.respond_to?(:is_a?) rescue true
-        param = JSON.from_object param if param_is_native
-        if param.is_a? self
-          param
-        elsif param.is_a? Hash
-          if opt == :validate_only 
-            true
+        base_class.eval do
+          param_is_native = !param.respond_to?(:is_a?) rescue true
+          param = JSON.from_object param if param_is_native
+          if param.is_a? self
+            param
+          elsif param.is_a? Hash
+            if opt == :validate_only 
+              true
+            else
+              new(param)
+            end
           else
-            new(param)
+            nil
           end
-        else
-          nil
         end
       end
       
+      self.inheritance_column
+        base_class.eval {@inheritance_column || "type"}
+      end
+      
+      self.inheritance_column=(name)
+        base_class.eval {@inheritance_column = name}
+      end
+      
     end
-    
+=end    
     def primary_key
       self.class.primary_key
     end
@@ -99,18 +133,10 @@ module ActiveRecord
       self
     end
     
-    def _reactive_record_initialize(attribute, value)
-      #puts "_reactive_record_initialize(#{attribute}, #{value})"
-      record = self.class._reactive_record_table_find(attribute, value) ||      
-        (React::PrerenderDataInterface.on_opal_server? and React::PrerenderDataInterface.fetch(*[model_name, attribute, value]))
-      if record
-        @record = record
-        @state = :loaded
-      else 
-        @record = {attribute => value}
-        #@state = :loading
-      end
+    def _reactive_record_initialize(record, attribute, value, state = nil)
+      @record = record
       @vector = [model_name, attribute, value]
+      @state = state
       self
     end
     
@@ -125,7 +151,7 @@ module ActiveRecord
 
     def _reactive_record_check_and_resolve_load_state
       React::PrerenderDataInterface.load!
-      #puts "#{self}._reactive_record_check_and_resolve_load_state @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{React::PrerenderDataInterface.last_fetch_at}) @vector = #{@vector}"
+      #puts "_reactive_rcord_check_and_resolve_load_state" #{}"#puts "#{self}._reactive_record_check_and_resolve_load_state" # @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{React::PrerenderDataInterface.last_fetch_at}) @vector = #{@vector}"
       return unless @vector # happens if a new active record model is created by the application 
       unless @state
         _reactive_record_fetch
@@ -133,6 +159,7 @@ module ActiveRecord
       end
       return @state if @state == :loaded or @state == :not_found
       if @state == :loading and  _reactive_record_pending?
+        #puts fetch miss!  
         React::WhileLoading.loading!
         return :loading
       end
@@ -154,7 +181,8 @@ module ActiveRecord
           value
         end
       end
-      @record.merge!((loaded_model.is_a? Hash) ? loaded_model : loaded_model.attributes)
+      #puts "merging #{@record} with loaded_model: (#{loaded_model})"
+      @record.merge!((loaded_model.is_a? Hash) ? loaded_model : loaded_model.attributes) if loaded_model
       @state = :loaded
     end
     
@@ -162,7 +190,20 @@ module ActiveRecord
       #puts "#{self.name}.find_by(#{opts})"
       attribute = opts.first.first
       value = opts.first.last
-      new._reactive_record_initialize(attribute, value)
+      record = _reactive_record_table_find(attribute, value) ||      
+        (React::PrerenderDataInterface.on_opal_server? and React::PrerenderDataInterface.fetch(*[model_name, attribute, value]))
+      if record
+        type = record[inheritance_column]
+        begin 
+          klass = Object.const_get(type)
+        rescue Exeception => e
+          message = "Could not subclass #{self.name} as #{type}.  Perhaps #{type} class has not been required. Exception: #{e}"
+          `console.error(#{message})`
+        end if type
+        (klass || self)._reactive_record_initialize(record, attribute, value, :loaded)
+      else 
+        new._reactive_record_initialize({attribute => value}, attribute, value)
+      end
     end
     
     def self.find(id)
@@ -172,7 +213,8 @@ module ActiveRecord
     def self.table_name=(name)
     end
     
-    def self.abstract_class=(name)
+    def self.abstract_class=(val)
+      @abstract_class = val
     end
     
     def self.scope(*args, &block)
@@ -236,7 +278,7 @@ module ActiveRecord
     end  
     
     def self._reactive_record_associations
-      @associations ||= {}
+      base_class.eval { @associations ||= {} }
     end
       
     {belongs_to: :singular, has_many: :plural, has_one: :singular, composed_of: :aggregate}.each do |method_name, assoc_type|
@@ -262,7 +304,7 @@ module ActiveRecord
             else 
               klass.new._reactive_record_initialize_vector(@vector + [name])
             end
-          elsif @record[name].is_a? klass or (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.is_a? klass))
+          elsif @record[name].class <= klass or (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.class <= klass))
             @record[name]
           elsif assoc_type == :aggregate
             @record[name] = klass.send(options[:constructor] || :new, *options[:mapping].collect { |mapping|  @record[name][mapping.last] })
