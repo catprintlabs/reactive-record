@@ -1,7 +1,7 @@
 module ActiveRecord
   class Base    
  
-=begin   
+  
     class << self
       
       # this section could be replaced with an interface to something like js-sql-lite
@@ -25,23 +25,23 @@ module ActiveRecord
       end
       
       def primary_key
-        base_class.eval { @primary_key || :id }
+        base_class.instance_eval { @primary_key || :id }
       end
       
       def primary_key=(val)
-       base_class.eval { @primary_key = val }
+       base_class.instance_eval { @primary_key = val }
       end
       
       def attr_accessible(*args)
-        base_class.eval { }
+        base_class.instance_eval { }
       end
       
       def _reactive_record_table
-        base_class.eval { @table ||= [] }
+        base_class.instance_eval { @table ||= [] }
       end
       
       def _reactive_record_table_find(attribute, value, dont_initialize_cache = nil)
-        base_class.eval do
+        base_class.instance_eval do
           unless @load_started 
             # protects this from recursive loading since _reactive_record_table_find is called from PrerenderDataInterface#initialize
             @load_started = true
@@ -53,7 +53,7 @@ module ActiveRecord
       end
       
       def _reactive_record_update_table(record)
-        base_class.eval do
+        base_class.instance_eval do
           #puts "rr_update_table"  #{record}, #{primary_key}"
           if r = _reactive_record_table_find(primary_key, record[primary_key], true)
             r.merge! record
@@ -65,7 +65,7 @@ module ActiveRecord
       end
       
       def _react_param_conversion(param, opt = nil)
-        base_class.eval do
+        base_class.instance_eval do
           param_is_native = !param.respond_to?(:is_a?) rescue true
           param = JSON.from_object param if param_is_native
           if param.is_a? self
@@ -82,16 +82,16 @@ module ActiveRecord
         end
       end
       
-      self.inheritance_column
-        base_class.eval {@inheritance_column || "type"}
+      def inheritance_column
+        base_class.instance_eval {@inheritance_column || "type"}
       end
       
-      self.inheritance_column=(name)
-        base_class.eval {@inheritance_column = name}
+      def inheritance_column=(name)
+        base_class.instance_eval {@inheritance_column = name}
       end
       
     end
-=end    
+   
     def primary_key
       self.class.primary_key
     end
@@ -200,7 +200,7 @@ module ActiveRecord
           message = "Could not subclass #{self.name} as #{type}.  Perhaps #{type} class has not been required. Exception: #{e}"
           `console.error(#{message})`
         end if type
-        (klass || self)._reactive_record_initialize(record, attribute, value, :loaded)
+        (klass || self).new._reactive_record_initialize(record, attribute, value, :loaded)
       else 
         new._reactive_record_initialize({attribute => value}, attribute, value)
       end
@@ -278,7 +278,7 @@ module ActiveRecord
     end  
     
     def self._reactive_record_associations
-      base_class.eval { @associations ||= {} }
+      base_class.instance_eval { @associations ||= {} }
     end
       
     {belongs_to: :singular, has_many: :plural, has_one: :singular, composed_of: :aggregate}.each do |method_name, assoc_type|
@@ -304,7 +304,8 @@ module ActiveRecord
             else 
               klass.new._reactive_record_initialize_vector(@vector + [name])
             end
-          elsif @record[name].class <= klass or (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.class <= klass))
+          elsif @record[name].class.ancestors.include? klass or 
+               (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.class.ancestors.include? klass))
             @record[name]
           elsif assoc_type == :aggregate
             @record[name] = klass.send(options[:constructor] || :new, *options[:mapping].collect { |mapping|  @record[name][mapping.last] })
