@@ -90,6 +90,11 @@ module ActiveRecord
         base_class.instance_eval {@inheritance_column = name}
       end
       
+      def model_name
+        # in reality should return ActiveModel::Name object, blah blah
+        name
+      end
+      
     end
    
     def primary_key
@@ -98,7 +103,7 @@ module ActiveRecord
     
     def model_name
       # in reality should return ActiveModel::Name object, blah blah
-      self.class.name
+      self.class.model_name
     end
     
     def initialize(*args)
@@ -292,7 +297,8 @@ module ActiveRecord
           #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
           _reactive_record_check_and_resolve_load_state
           if @state == :not_found
-            puts "NOT FOUND "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}""
+            message = "REACTIVE_RECORD NOT FOUND: #{self}.#{name}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
+            `console.error(#{message})`
             nil
           elsif !@state or @state == :loading or !@record.has_key? name 
             #puts "about to create dummy records #{@vector}"
