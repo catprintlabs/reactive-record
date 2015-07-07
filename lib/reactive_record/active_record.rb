@@ -133,6 +133,14 @@ module ActiveRecord
       @record
     end
     
+    def save(&block)
+      if @state == :loaded
+        HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {model: model_name, attributes: attributes}).then do |response|
+          yield response.json[:success], json[:message] if block
+        end
+      end
+    end
+    
     def _reactive_record_initialize_vector(vector)
       @vector = vector
       self

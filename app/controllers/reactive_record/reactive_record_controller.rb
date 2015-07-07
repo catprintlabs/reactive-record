@@ -30,6 +30,27 @@ module ReactiveRecord
         end
       end
     end
+    
+    def save
+      attributes = params[:attributes]
+      model = Object.const_get(params[:model])
+      id = attributes[model.primary_key]
+      begin
+        if id
+          record = model.find(id)
+          keys = record.attributes.keys
+          attributes.each do |key, value|
+            record[key] = value if keys.include? key
+          end
+          record.save!
+        else
+          model.new(attributes).save!
+        end
+        render :json => {success: true}
+      rescue Exception => e
+        render :json => {success: false, message: e.message}
+      end
+    end
   
   end
   
