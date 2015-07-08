@@ -135,8 +135,13 @@ module ActiveRecord
     
     def save(&block)
       if @state == :loaded
+        @save_state = :saving
+        React::State.set_state(self, :save_state, @save_state)
         HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {model: model_name, attributes: attributes}).then do |response|
-          yield response.json[:success], json[:message] if block
+          self.class._reactive_record_update_table(response.json[:attributes])  if response.json[:success]
+          @save_state = nil
+          yield response.json[:success], response.json[:message] if block
+          React::State.set_state(self, :save_state, @save_state)
         end
       end
     end
@@ -304,6 +309,7 @@ module ActiveRecord
           klass = Object.const_get klass_name
           #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
           _reactive_record_check_and_resolve_load_state
+          React::State.get_state(self, :save_state) if @state == :loaded
           if @state == :not_found
             message = "REACTIVE_RECORD NOT FOUND: #{self}.#{name}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
             `console.error(#{message})`
@@ -348,11 +354,23 @@ module ActiveRecord
 
     def method_missing(name, *args, &block)
       #puts "#{self}.#{name}(#{args})" # (called #{model_name} instance method missing)"
-      if args.count == 1 && name =~ /=$/ && !block
+      if name =~ /_changed\?$/
+        _reactive_record_check_and_resolve_load_state
+        if @state == :loaded
+          React::State.get_state(self, :save_state)
+          attribute_name = name.gsub(/_changed\?$/,"")
+          saved_model = self.class.find(@record[primary_key])
+          @record[attribute_name] != saved_model.attributes[attribute_name]
+        end
+      elsif args.count == 1 && name =~ /=$/ && !block
         _reactive_record_check_and_resolve_load_state
         @record[name.gsub(/=$/,"")] = args[0]
+        @save_state = :dirty
+        React::State.set_state(self, :save_state, @save_state) if @state == :loaded
+        args[0]
       elsif args.count == 0 && !block 
         _reactive_record_check_and_resolve_load_state
+        React::State.get_state(self, :save_state) if @state == :loaded
         if @record.has_key? name
           @record[name] 
         else
@@ -374,6 +392,16 @@ module ActiveRecord
     def not_found?
       _reactive_record_check_and_resolve_load_state == :not_found
     end
+    
+    def changed?
+      @save_state
+    end
+    
+    def saving?
+      @save_state == :saving
+    end
+    
+    
     
   end
 end

@@ -46,9 +46,9 @@ module ReactiveRecord
         else
           model.new(attributes).save!
         end
-        render :json => {success: true}
+        render :json => {success: true, attributes: ReactiveRecord.build_json_hash(record)}
       rescue Exception => e
-        render :json => {success: false, message: e.message}
+        render :json => {success: false, attributes: {}, message: e.message}
       end
     end
   
