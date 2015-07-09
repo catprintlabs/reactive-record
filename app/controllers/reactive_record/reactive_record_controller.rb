@@ -1,10 +1,10 @@
 require 'reactive_record/cache'
 
 module ReactiveRecord
-  
+
   class ReactiveRecordController < ApplicationController
-  
-    #todo make sure this is right... looks like model.id always returns the attribute value of the primary key regardless of what the key is. 
+
+    #todo make sure this is right... looks like model.id always returns the attribute value of the primary key regardless of what the key is.
 
     def fetch
       @data = Hash.new {|hash, key| hash[key] = Hash.new}
@@ -16,7 +16,7 @@ module ReactiveRecord
       end
       render :json => @data
     end
-                  
+
     def fetch_association(item, associations)
       @data[item.class.name][item.id] ||= ReactiveRecord.build_json_hash(item)
       unless associations.empty?
@@ -30,7 +30,7 @@ module ReactiveRecord
         end
       end
     end
-    
+
     def save
       attributes = params[:attributes]
       model = Object.const_get(params[:model])
@@ -51,7 +51,20 @@ module ReactiveRecord
         render :json => {success: false, attributes: {}, message: e.message}
       end
     end
-  
+
+    def destroy
+      attributes = params[:attributes]
+      model = Object.const_get(params[:model])
+      id = attributes[model.primary_key]
+      begin
+        record = model.find(id)
+        record.delete!
+        render :json => {success: true, attributes: {}}
+      rescue Exception => e
+        render :json => {success: false, record: record, message: e.message}
+      end
+    end
+
   end
-  
+
 end
