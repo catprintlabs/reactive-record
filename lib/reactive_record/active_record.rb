@@ -54,13 +54,9 @@ module ActiveRecord
 
       def _reactive_record_update_table(record, remove = false)
         base_class.instance_eval do
-          #puts "rr_update_table"  #{record}, #{primary_key}"
+          #puts "rr_update_table  #{record}, #{primary_key}"
           if r = _reactive_record_table_find(primary_key, record[primary_key], true)
-            if remove
-              r.delete! record
-            else
-              r.merge! record
-            end
+            r.merge! record
           else
             _reactive_record_table << record
             record
@@ -153,8 +149,8 @@ module ActiveRecord
     def destroy(&block)
       @save_state = :destroying
       React::State.set_state(self, :save_state, @save_state)
-      HTTP.post(`window.ReactiveRecordEnginePath`+"/delete", payload: {model: model_name, attributes: attributes}).then do |response|
-        self.class._reactive_record_update_table(response.json[:attributes], true)  if response.json[:success]
+      HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: model_name, attributes: attributes}).then do |response|
+        self.class._reactive_record_table.delete(attributes) if response.json[:success]
         @save_state = nil
         yield response.json[:success], response.json[:message] if block
         React::State.set_state(self, :save_state, @save_state)

@@ -58,7 +58,7 @@ module ReactiveRecord
       id = attributes[model.primary_key]
       begin
         record = model.find(id)
-        record.delete!
+        record.destroy
         render :json => {success: true, attributes: {}}
       rescue Exception => e
         render :json => {success: false, record: record, message: e.message}
