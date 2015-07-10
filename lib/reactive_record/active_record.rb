@@ -1,7 +1,6 @@
 module ActiveRecord
-  class Base    
+  class Base   
  
-  
     class << self
       
       # this section could be replaced with an interface to something like js-sql-lite
@@ -109,7 +108,8 @@ module ActiveRecord
     def initialize(*args)
       if args[0]
         attributes = args[0]
-        self.class._reactive_record_associations.each do | attribute, klass_name | 
+        self.class._reactive_record_associations.each do | attribute, klass_and_method_names | 
+          klass_name = klass_and_method_names.first
           if attributes[attribute]
             klass = Object.const_get klass_name
             attributes[attribute] = if attributes[attribute].is_a? Array
@@ -172,6 +172,7 @@ module ActiveRecord
       #puts "_reactive_rcord_check_and_resolve_load_state" #{}"#puts "#{self}._reactive_record_check_and_resolve_load_state" # @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{React::PrerenderDataInterface.last_fetch_at}) @vector = #{@vector}"
       return unless @vector # happens if a new active record model is created by the application 
       unless @state
+        puts "fetching #{@vector}"
         _reactive_record_fetch
         return (@state = :loading)
       end
@@ -304,7 +305,7 @@ module ActiveRecord
       self.class.define_method(method_name) do |name, options = {}|
         
         klass_name = options[:class_name] || (assoc_type == :plural && name.camelize.gsub(/s$/,"")) || name.camelize
-        _reactive_record_associations[name] = klass_name unless assoc_type == :aggregate
+        _reactive_record_associations[name] = [klass_name, method_name] unless assoc_type == :aggregate
         define_method(name) do 
           klass = Object.const_get klass_name
           #puts "#{self}.#{name} @state: #{@state}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
@@ -314,8 +315,8 @@ module ActiveRecord
             message = "REACTIVE_RECORD NOT FOUND: #{self}.#{name}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
             `console.error(#{message})`
             nil
-          elsif !@state or @state == :loading or !@record.has_key? name 
-            #puts "about to create dummy records #{@vector}"
+          elsif !@state or @state == :loading or (!@record.has_key?(name) and (!@record.has_key?("#{name}_id") or @record["#{name}_id"]))
+            #puts "about to create dummy records #{@vector} "
             _reactive_record_fetch if [:aggregate, :plural].include? assoc_type and @state == :loaded
             if assoc_type == :aggregate
               DummyAggregate.new
@@ -324,7 +325,7 @@ module ActiveRecord
             else 
               klass.new._reactive_record_initialize_vector(@vector + [name])
             end
-          elsif @record[name].class.ancestors.include? klass or 
+          elsif !@record[name] or @record[name].class.ancestors.include? klass or 
                (@record[name].is_a? Array and (@record[name].count == 0 or @record[name].first.class.ancestors.include? klass))
             @record[name]
           elsif assoc_type == :aggregate

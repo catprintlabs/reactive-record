@@ -25,7 +25,7 @@ module ReactiveRecord
           association_value.each do |item|
             fetch_association(item, associations[1..-1])
           end
-        else
+        elsif association_value
           fetch_association(association_value, associations[1..-1])
         end
       end
