@@ -171,7 +171,6 @@ module ActiveRecord
 
     def _reactive_record_fetch
       @fetched_at = Time.now
-      puts "in reactive record fetch"
       React::PrerenderDataInterface.fetch(*@vector)
     end
 
@@ -184,7 +183,6 @@ module ActiveRecord
       #puts "_reactive_rcord_check_and_resolve_load_state" #{}"#puts "#{self}._reactive_record_check_and_resolve_load_state" # @state = #{@state}, pending = #{_reactive_record_pending?}(#{@fetched_at} > #{React::PrerenderDataInterface.last_fetch_at}) @vector = #{@vector}"
       return unless @vector # happens if a new active record model is created by the application
       unless @state
-        puts "calling from check and resolve load state"
         _reactive_record_fetch
         return (@state = :loading)
       end
@@ -327,9 +325,9 @@ module ActiveRecord
             message = "REACTIVE_RECORD NOT FOUND: #{self}.#{name}, @vector: [#{@vector}], @record[#{name}]: #{@record[name]}"
             `console.error(#{message})`
             nil
-          elsif !@state or @state == :loading or (!@record.has_key?(name) and !(@record.has_key?("#{name}_id") and @record["#{name}_id"]))
+          elsif !@state or @state == :loading or (!@record.has_key?(name) and !(@record.has_key?("#{name}_id") and !@record["#{name}_id"]))
             #puts "about to create dummy records #{@vector}"
-            _reactive_record_fetch.tap { puts "calling from reactive record associations" } if [:aggregate, :plural].include? assoc_type and @state == :loaded
+            _reactive_record_fetch if [:aggregate, :plural].include? assoc_type and @state == :loaded
             if assoc_type == :aggregate
               DummyAggregate.new
             elsif assoc_type == :plural
