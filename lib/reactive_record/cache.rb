@@ -2,11 +2,11 @@ require 'json'
 require 'opal-react/prerender_data_interface'
 
 module React
-  
+
   class PrerenderDataInterface
-    
+
     alias_method :pre_reactive_record_initialize, :initialize
-    
+
     def initialize(*args)
       pre_reactive_record_initialize(*args)
       @initial_data = Hash.new {|hash, key| hash[key] = Hash.new}
@@ -20,9 +20,9 @@ module React
         end unless `typeof window.ClientSidePrerenderDataInterface === 'undefined'`
       end
     end
-    
+
     attr_reader :last_fetch_at
-    
+
     def self.last_fetch_at
       load!.last_fetch_at
     end
@@ -62,7 +62,7 @@ module React
       puts "fetch exception #{RUBY_ENGINE} fetch(#{klass}, #{find_by}, #{value}, #{associations}) #{e}"
       raise e
     end
-    
+
     def self.fetch(*args)
       load!.fetch(*args)
     end
@@ -73,9 +73,9 @@ module React
     end
 
     unless RUBY_ENGINE == 'opal'
-      
+
       alias_method :pre_reactive_record_generate_next_footer, :generate_next_footer
-      
+
       def generate_next_footer
         json = @initial_data.to_json
         @initial_data = Hash.new {|hash, key| hash[key] = Hash.new}
@@ -87,7 +87,7 @@ module React
           "</script>\n"
         ).html_safe
       end
-      
+
     end
 
     def schedule_fetch
@@ -95,7 +95,7 @@ module React
       @fetch_scheduled ||= after(0.001) do
         #puts "starting fetch"
         last_fetch_at = @last_fetch_at
-        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response| 
+        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response|
           #puts "fetch returned"
           response.json.each do |klass, models|
             models.each do |id, attributes|
@@ -105,7 +105,7 @@ module React
               else
                 message = "Server returned unknown model: #{klass}."
                 `console.error(#{message})`
-              end 
+              end
             end
           end
           #puts "updating observers"
@@ -122,16 +122,16 @@ module React
     rescue Exception => e
       puts "schedule_fetch Execption #{e.message}"
     end
-    
+
   end
-  
+
 end
-    
+
 
 module ReactiveRecord
-  
+
   if RUBY_ENGINE != 'opal'
-    
+
     def self.get_type_hash(record)
       {record.class.inheritance_column => record[record.class.inheritance_column]}
     end
@@ -139,9 +139,9 @@ module ReactiveRecord
     def self.build_json_include_hash(record)
       Hash[
         *record.class.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}] }.flatten,
-        *record.class.reflect_on_all_associations.collect do |assoc| 
+        *record.class.reflect_on_all_associations.collect do |assoc|
           [
-            assoc.name, 
+            assoc.name,
             {only: :id, include: Hash[assoc.class_name.camelize.constantize.reflect_on_all_aggregations.collect { |aggregate| [aggregate.name, {}]}]}
           ] unless assoc.options[:server_only]
         end.compact.flatten
@@ -153,7 +153,7 @@ module ReactiveRecord
     end
 
   end
-  
+
   def self.load(&block)
     promise = Promise.new
     @load_stack ||= []
@@ -169,11 +169,11 @@ module ReactiveRecord
     @loads_pending = @load_stack.pop
     promise
   end
-  
+
   def self._loads_pending!
     @loads_pending = true
   end
-  
+
   def self._run_blocks_to_load
     if @blocks_to_load
       @blocks_to_load = @blocks_to_load.collect do |promise_and_block|
@@ -188,7 +188,5 @@ module ReactiveRecord
       end.compact
     end
   end
-  
-end
 
-    
+end
