@@ -10,7 +10,7 @@ else
   require "reactive_record/serializers"
   require "active_record"
   module ActiveRecord::Associations::Builder
-    class Association #:nodoc:
+    class Association 
       def validate_options
         options.assert_valid_keys(self.class.valid_options + [:server_only])
       end

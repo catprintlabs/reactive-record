@@ -35,9 +35,10 @@
 #       address.save  # state change to address WE DO want to rerender
 #
 # conclusion 
-#  1) stick with active_record approach, otherwise it could get very difficult to control things.
-#  2) new_record? needs to have its own react state separate from the actual record data, 
-#  3) we might want to have each attribute have its own state as well
+#  1) new_record? needs to have its own react state separate from the actual record data, 
+#  2) we need to have each attribute have its own state as well
+#  3) given 1+2 we should have all instances of a record be talking to the same data
+#  3a) because rendering should alway re-instantiate instances (or it 
 
 # loading is a special case.  The loading state is NOT tracked in the actual objects.  Loading is done in one batch, either everything is 
 # loaded, or else we are waiting for loads.  
