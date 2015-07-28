@@ -21,19 +21,19 @@ module ActiveRecord
     end
 
     def primary_key
-      base_class.instance_eval { @primary_key || :id }
+      base_class.instance_eval { @primary_key_value || :id }
     end
 
     def primary_key=(val)
-     base_class.instance_eval { @primary_key = val }
+     base_class.instance_eval {  @primary_key_value = val }
     end
     
     def inheritance_column
-      base_class.instance_eval {@inheritance_column || "type"}
+      base_class.instance_eval {@inheritance_column_value || "type"}
     end
 
     def inheritance_column=(name)
-      base_class.instance_eval {@inheritance_column = name}
+      base_class.instance_eval {@inheritance_column_value = name}
     end
 
     def model_name
@@ -42,19 +42,19 @@ module ActiveRecord
     end
 
     def find(id)
-      ReactiveRecord::Base.find(self, primary_key, id)
+      base_class.instance_eval {ReactiveRecord::Base.find(self, primary_key, id)}
     end
     
     def find_by(opts = {})
-      ReactiveRecord::Base.find(self, opts.first.first, opts.first.last)
+      base_class.instance_eval {ReactiveRecord::Base.find(self, opts.first.first, opts.first.last)}
     end
     
-    def self.method_missing(name, *args, &block)
+    def method_missing(name, *args, &block)
       #puts "#{self.name}.#{name}(#{args}) (called class method missing)"
       if args.count == 1 && name =~ /^find_by_/ && !block
         find_by(name.gsub(/^find_by_/, "") => args[0])
       else
-        super
+        raise "#{self.name}.#{name}(#{args}) (called class method missing)"
       end
     end
     
@@ -98,8 +98,10 @@ module ActiveRecord
         if opt == :validate_only
           ReactiveRecord::Base.infer_type_from_hash(self, param) == self
         else
+          target = find(param[primary_key])
           param.each { |key, value| param[key] = [value] }
-          ReactiveRecord::Base.load_from_json({self.name => {["find", param[self.primary_key].first] =>  param})
+          ReactiveRecord::Base.load_from_json(param, target)
+          target
         end
       else
         nil

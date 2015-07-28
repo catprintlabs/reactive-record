@@ -95,12 +95,12 @@ module ReactiveRecord
       if RUBY_ENGINE != 'opal'
       
         def [](*vector)
-          vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }.tap | cache_item |
+          vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }.tap do | cache_item |
             @requested_cache_items << cache_item
           end
         end
       
-        def self[vectors]
+        def self.[](vectors)
           cache = new
           vectors.each { |vector| cache[*vector] }
           cache.as_json
@@ -117,11 +117,11 @@ module ReactiveRecord
           end
         end
         
-        def select(&block); @cache.select block; end
+        def select(&block); @cache.select &block; end
         
-        def detect(&block); @cache.detect block; end
+        def detect(&block); @cache.detect &block; end
         
-        def inject(initial, &block); @cache.inject(initial) block end
+        def inject(initial, &block); @cache.inject(initial) &block; end
         
         class CacheItem
 
@@ -135,13 +135,20 @@ module ReactiveRecord
           def id
             @record_chain[0]
           end
+          
+          def self.new(db_cache, klass)
+            return existing if existing = db_cache.detect { |cached_item| cached_item.vector == [klass] }
+            super
+          end
 
           def initialize(db_cache, klass)
+            klass = klass.constantize
             @db_cache = db_cache
-            vector = [klass]
+            @vector = [klass]
             @ar_object = klass
             @record_chain = []
             @parent = nil
+            db_cache << self
           end
           
           def apply_method_to_cache(method, result)
@@ -168,12 +175,12 @@ module ReactiveRecord
           
           def build_new_instances(method)
             if method == "*all" 
-              apply_method_to_cache @ar_object.collect { |record| record.id }
-            elsif @ar_object.respond_to? method  
-              apply_method_to_cache @ar_object.send *method
+              apply_method_to_cache method, @ar_object.collect { |record| record.id }
+            elsif @ar_object.respond_to? [*method].first  
+              apply_method_to_cache method, @ar_object.send(*method)
             elsif method == "*" and @ar_object and @ar_object.length > 0
               ar_object.inject(nil) do | value, record |
-                apply_method_to_cache(method, record)
+                apply_method_to_cache method, record
               end
             else
               self
@@ -181,13 +188,14 @@ module ReactiveRecord
           end
           
           def as_hash(children = [@ar_object])
+            puts "as_hash(#{children}) < @parent: #{@parent}, vector: #{vector}, @ar_record: #{@ar_record} >"
             if @parent
               if @ar_record.class < ActiveRecord::Base 
                 @parent.as_hash({
                   :id => @ar_record.id, 
                   @ar_record.class.inheritance_column => @ar_record[@ar_record.class.inheritance_column],
                   vector.last => children})
-              elsif vector.last = "*"
+              elsif vector.last == "*"
                 @parent.as_hash({children[:id] => children})
               else
                 @parent.as_hash({vector.last => children})
@@ -200,27 +208,39 @@ module ReactiveRecord
         end
       
       end
-      
-      # this is only used client side, but to enable testing we keep on the server as well
-        
+              
       def self.load_from_json(tree, target = nil)
-        tree.each do |method, value|
-          if !target
-            new_target = Object.const_get(method)
-          elsif method == "*all"
-            target.replace value.collect { |id| target.proxy_association.klass.find(id) }
-          elsif method.is_a? Integer or method =~ /^[0-9]+$/
-            new_target = target.proxy_association.klass.find(method)
-            target << new_target
-          elsif method.is_a? Array
-            target.send "#{method}=" method.first
-          else
-            new_target = target.send *method
-            target.send "#{method}=" new_target rescue nil
+        puts "load_from_json(#{tree}, #{target})"
+        if target
+          tree.each do |method, value|
+            puts "loading #{method} => #{value}"
+            new_target = nil
+            if method == "*all"
+              target.replace value.collect { |id| target.proxy_association.klass.find(id) }
+              puts "updated all values"
+            elsif method.is_a? Integer or method =~ /^[0-9]+$/
+              new_target = target.proxy_association.klass.find(method)
+              target << new_target
+              puts "#{new_target} pushed on collection"
+            elsif method.is_a? Array
+              target.send "#{method}=", method.first
+              new_target = target.send *method
+              puts "target now = #{new_target}"
+            elsif value.is_a? Array
+              target.send "#{method}=", value.first
+              puts "target.#{method} set to #{value.first}"
+            else
+              new_target = target.send *method
+              target.send "#{method}=", new_target rescue nil
+              puts "target.#{method} set to #{new_target}"
+            end
+            load_from_json(value, new_target) if new_target
           end
-          load_from_json(value, new_target) if new_target
+          puts "target will be saved? #{target.respond_to? :save}"
+          target.save if target.respond_to? :save 
+        else
+          load_from_json(tree, Object.const_get(method))
         end
-        target.save if target.respond_to? :save 
       end
       
       

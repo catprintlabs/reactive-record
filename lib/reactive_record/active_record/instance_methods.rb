@@ -12,7 +12,7 @@ module ActiveRecord
       else
         # standard active_record new -> creates a new instance, primary key is ignored if present
         hash[primary_key] = nil
-        @backing_record = ReactiveRecord::Base.new(base_class, self)
+        @backing_record = ReactiveRecord::Base.new(self.class, hash, self)
       end
     end
     
@@ -41,7 +41,7 @@ module ActiveRecord
       @backing_record == ar_instance.instance_eval { @backing_record }
     end
     
-    def method_missing(method, *args, &block)
+    def method_missing(name, *args, &block)
       if name =~ /_changed\?$/
         @backing_record.changed?(name.gsub(/_changed\?$/,""))
       elsif args.count == 1 && name =~ /=$/ && !block

@@ -5,10 +5,5 @@ module ActiveRecord
      
     include InstanceMethods
     
-    include Associations
-    
-    include Aggregations
-    
-    include ReactiveAttributes
-    
   end
+end

@@ -1,4 +1,4 @@
-require 'reactive_record/cache'
+require 'reactive_record/server_data_cache'
 
 module ReactiveRecord
 
