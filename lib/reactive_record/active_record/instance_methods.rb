@@ -21,7 +21,7 @@ module ActiveRecord
     end
     
     def id
-      @backing_record.id
+      @backing_record.reactive_get!(primary_key)
     end
     
     def id=(value)

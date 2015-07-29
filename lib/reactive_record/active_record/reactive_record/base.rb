@@ -33,6 +33,10 @@ module ReactiveRecord
       @records ||= Hash.new { |hash, key| hash[key] = [] }
     end
     
+    def self.reset_records!  # primarly for testing
+      @records = nil
+    end
+    
     def records
       self.class.records
     end
@@ -148,23 +152,23 @@ module ReactiveRecord
   
     def reactive_get!(attribute)
       apply_method(attribute) unless @attributes.has_key? attribute 
-      React::State.get_state(@attributes, attribute) unless data_loading?
+      React::State.get_state(self, attribute) unless data_loading?
       attributes[attribute]
     end
   
     def reactive_set!(attribute, value)
       attributes[attribute] = value
-      React::State.set_state(@attributes, attribute, value) unless data_loading?
+      React::State.set_state(self, attribute, value) unless data_loading?
       value
     end
   
     def get_state!
-      React::State.get_state(self, :state) unless data_loading?
+      React::State.get_state(self, self) unless data_loading?
       @state
     end
   
     def changed?(*args)
-      args.count == 0 ? React::State.get_state(self, :state) : React::State.get_state(@attributes, args[0])
+      args.count == 0 ? React::State.get_state(self, self) : React::State.get_state(@attributes, args[0])
       @attributes != @synced_attributes and (args.count == 0 or @attributes[args[0]] != @synced_attributes[args[0]])
     end
   
@@ -175,7 +179,7 @@ module ReactiveRecord
     end
   
     def sync_attribute(attribute, value)
-      puts "syncing attribute"
+      #puts "syncing attribute"
       @synced_attributes[attribute] = attributes[attribute] = value
     end
   
@@ -194,7 +198,7 @@ module ReactiveRecord
     
       # Fills in the value returned by sending "method" to the corresponding server side db instance
       return unless id or vector  # record is "new" so just return, we really want to somehow get default values?  Possible?
-      puts "applying method"
+      #puts "applying method"
       sync_attribute(
         method, 
         if association = @model.reflect_on_association(method)

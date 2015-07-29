@@ -91,9 +91,7 @@ module React
       @fetch_scheduled ||= after(0.001) do
         last_fetch_at = @last_fetch_at
         HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response|
-          ReactiveRecord.sync do
-            ReactiveRecord::ServerDataCache.load_from_json(response)
-          end
+          ReactiveRecord::Base.load_from_json(response.json)
           ReactiveRecord.run_blocks_to_load
           React::WhileLoading.loaded_at last_fetch_at
         end if @pending_fetches.count > 0
@@ -102,7 +100,7 @@ module React
         @fetch_scheduled = nil
       end
     rescue Exception => e
-      puts "schedule_fetch Execption #{e.message}"
+      puts "schedule_fetch Exception #{e.message}"
     end
 
   end
