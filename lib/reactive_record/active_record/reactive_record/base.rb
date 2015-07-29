@@ -44,10 +44,19 @@ module ReactiveRecord
     def self.data_interface
       @data_interface ||= React::PrerenderDataInterface.new
     end
-    
-    def data_interface
-      self.class.data_interface
+
+    def self.fetch_from_db(*vector)
+      data_interface.fetch_from_db(vector) # because fetch_from_db is cross platform we can't use splat
     end
+    
+    def self.find_in_db(*args)
+      data_interface.find_in_db(*args)
+    end
+    
+    def self.load_from_db(*vector)
+      data_interface.load_from_db(*vector)
+    end
+
     
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -80,7 +89,7 @@ module ReactiveRecord
       # so find the id of of record with the attribute-value pair, and see if that is loaded.
       # find_in_db returns nil if we are not prerendering which will force us to create a new record
       # because there is no way of knowing the id.
-      if !record and attribute != model.primary_key and id = data_interface.find_in_db(model, model.primary_key, id)
+      if !record and attribute != model.primary_key and id = find_in_db(model, model.primary_key, id)
         record = records[model].detect { |record| record.id == id} 
       end
       # if we don't have a record then create one
@@ -190,7 +199,7 @@ module ReactiveRecord
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
-      instance.instance_eval { @backing_record.attributes[inverse_of.attribute] = self.ar_instance} if inverse_of
+      instance.instance_eval { @backing_record.attributes[inverse_of] = self.ar_instance} if inverse_of
       instance
     end
         
@@ -198,21 +207,20 @@ module ReactiveRecord
     
       # Fills in the value returned by sending "method" to the corresponding server side db instance
       return unless id or vector  # record is "new" so just return, we really want to somehow get default values?  Possible?
-      #puts "applying method"
       sync_attribute(
         method, 
         if association = @model.reflect_on_association(method)
           if association.collection? 
-            Collection.new(association.klass, self, association, *vector, method)
+            Collection.new(association.klass, @ar_instance, association, *vector, method)
           else
-            find_association(association, (id and data_interface.fetch_from_db(model, [:find, id], method, model.primary_key)))
+            find_association(association, (id and self.class.fetch_from_db(@model, [:find, id], method, @model.primary_key)))
           end
         elsif aggregation = @model.reflect_on_aggregation(method)
           new_from_vector(aggregation.klass, self, *vector, method)
         elsif id  
-          data_interface.fetch_from_db(@model, [:find, id], method) || data_interface.load_from_db(*vector, method)
+          self.class.fetch_from_db(@model, [:find, id], method) || self.class.load_from_db(*vector, method)
         else  # its a attribute in an aggregate or we are on the client and don't know the id
-          data_interface.fetch_from_db(*vector, method) || data_interface.load_from_db(*vector, method)
+          self.class.fetch_from_db(*vector, method) || self.class.load_from_db(*vector, method)
         end
       )
     end

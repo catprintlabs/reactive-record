@@ -95,9 +95,9 @@ module ReactiveRecord
       if RUBY_ENGINE != 'opal'
       
         def [](*vector)
-          vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }.tap do | cache_item |
-            @requested_cache_items << cache_item
-          end
+          vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }
+          vector[0] = vector[0].constantize
+          @requested_cache_items += @cache.select { | cache_item | cache_item.vector == vector}
         end
       
         def self.[](vectors)
@@ -131,10 +131,14 @@ module ReactiveRecord
           def value 
             @ar_object
           end
-
-          def id
-            @record_chain[0]
+          
+          def method
+            vector.last
           end
+
+          #def id
+          #  @record_chain[0]
+          #end
           
           def self.new(db_cache, klass)
             return existing if existing = db_cache.detect { |cached_item| cached_item.vector == [klass] }
@@ -151,15 +155,14 @@ module ReactiveRecord
             db_cache << self
           end
           
-          def apply_method_to_cache(method, result)
-            parent = self
+          def apply_method_to_cache(method, &block)
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
                 cache_item.clone.instance_eval do
-                  @vector = @vector + [method]
-                  @ar_object = result
+                  @vector = @vector + [method]  # don't push it on since you need a new vector!
+                  @ar_object = yield cache_item
                   @db_cache << self
-                  @parent = parent
+                  @parent = cache_item
                   self
                 end
               else
@@ -174,34 +177,38 @@ module ReactiveRecord
           end
           
           def build_new_instances(method)
+            puts "build_new_instances(#{method}) <@ar_object: #{@ar_object}>"
             if method == "*all" 
-              apply_method_to_cache method, @ar_object.collect { |record| record.id }
-            elsif @ar_object.respond_to? [*method].first  
-              apply_method_to_cache method, @ar_object.send(*method)
+              apply_method_to_cache(method) { |cache_item| cache_item.value.collect { |record| record.id }}
             elsif method == "*" and @ar_object and @ar_object.length > 0
-              ar_object.inject(nil) do | value, record |
-                apply_method_to_cache method, record
+              @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
+                apply_method_to_cache(method) { record }
               end
+            elsif @ar_object.respond_to? [*method].first  
+              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method)}
             else
               self
             end
           end
           
           def as_hash(children = [@ar_object])
-            #puts "as_hash(#{children}) < @parent: #{@parent}, vector: #{vector}, @ar_record: #{@ar_record} >"
+            puts "as_hash(#{children}) < @parent: #{@parent}, vector: #{vector}, @ar_object: #{@ar_object} >"
             if @parent
-              if @ar_record.class < ActiveRecord::Base 
-                @parent.as_hash({
-                  :id => @ar_record.id, 
-                  @ar_record.class.inheritance_column => @ar_record[@ar_record.class.inheritance_column],
-                  vector.last => children})
-              elsif vector.last == "*"
-                @parent.as_hash({children[:id] => children})
+              if method == "*"
+                puts "******** @ar_object: #{@ar_object} "
+                @parent.as_hash({@ar_object.id => children})
+              elsif @ar_object.class < ActiveRecord::Base 
+                @parent.as_hash({method => children.merge({
+                  :id => [@ar_object.id], 
+                  @ar_object.class.inheritance_column => [@ar_object[@ar_object.class.inheritance_column]],
+                  })})
+              elsif method == "*all"
+                @parent.as_hash({method => children.first})
               else
-                @parent.as_hash({vector.last => children})
+                @parent.as_hash({method => children})
               end
             else
-              {vector.last.name => children}
+              {method.name => children}
             end
           end
 
@@ -225,7 +232,7 @@ module ReactiveRecord
             target << new_target
             #puts "#{new_target} pushed on collection"
           elsif method.is_a? Array
-            target.send "#{method}=", method.first
+            target.send "#{method}=", method.first  # I THINK THIS SHOULD BE COMMENTED OUT ?????
             new_target = target.send *method
             #puts "target now = #{new_target}"
           elsif value.is_a? Array

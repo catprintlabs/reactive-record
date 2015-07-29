@@ -3,7 +3,7 @@ module ActiveRecord
   module InstanceMethods
         
     def attributes
-      @backing_record
+      @backing_record.attributes
     end
     
     def initialize(hash = {})

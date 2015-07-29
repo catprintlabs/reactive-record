@@ -13,13 +13,13 @@ module ReactiveRecord
     def all
       unless @collection
         @collection = []
-        if ids = fetch_from_db(*@vector, "*all")  
+        if ids = ReactiveRecord::Base.fetch_from_db(*@vector, "*all")  
           ids.each do |id| 
-            @collection << @target_klass.find(@target_klass.primary_key, id) 
+            @collection << @target_klass.find(@target_klass.primary_key => id) 
           end
         else
-          load_from_db(@vector, "*all")
-          @collection << @target_klass.new(ReactiveRecord.new_from_vector(@target_klass, nil, [*@vector, "*"]))
+          ReactiveRecord::Base.load_from_db(*@vector, "*all")
+          @collection << ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
         end
       end
       @collection
@@ -36,7 +36,9 @@ module ReactiveRecord
     end
     
     def <<(item)
-      item.attributes[inverse_of.attribute] = @owner if @owner and inverse_of = @association.inverse_of
+      if @owner and inverse_of = @association.inverse_of
+        item.attributes[inverse_of] = @owner 
+      end
       all << item unless all.include? item
     end
   
