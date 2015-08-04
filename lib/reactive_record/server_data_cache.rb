@@ -95,9 +95,17 @@ module ReactiveRecord
       if RUBY_ENGINE != 'opal'
       
         def [](*vector)
+          puts "Cache[#{vector}]"
           vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }
+          puts "did inject"
           vector[0] = vector[0].constantize
-          @requested_cache_items += @cache.select { | cache_item | cache_item.vector == vector}
+          puts "vectorized vector[0]"
+          new_items = @cache.select { | cache_item | cache_item.vector == vector}
+          puts "new_items: #{new_items}"
+          @requested_cache_items += new_items
+          new_items.last.value if new_items.last
+        rescue Exception => e
+          puts "bazzoka #{e}"
         end
       
         def self.[](vectors)
@@ -107,14 +115,14 @@ module ReactiveRecord
         end
         
         def clear_requests
-          requested_cache_items = @requested_cache_items
           @requested_cache_items = []
         end
         
         def as_json
+          puts "*********** as json **********"
           @requested_cache_items.inject({}) do | hash, cache_item|
             hash.deep_merge! cache_item.as_hash
-          end
+          end.tap { |r| puts "returns #{r}"}
         end
         
         def select(&block); @cache.select &block; end
@@ -159,6 +167,7 @@ module ReactiveRecord
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
                 cache_item.clone.instance_eval do
+                  puts "method = #{method} type = #{method.class}"
                   @vector = @vector + [method]  # don't push it on since you need a new vector!
                   @ar_object = yield cache_item
                   @db_cache << self
@@ -185,7 +194,8 @@ module ReactiveRecord
                 apply_method_to_cache(method) { record }
               end
             elsif @ar_object.respond_to? [*method].first  
-              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method)}
+              apply_method_to_cache(method) { |cache_item| 
+                cache_item.value.send(*method)}
             else
               self
             end
@@ -217,35 +227,35 @@ module ReactiveRecord
       end
               
       def self.load_from_json(tree, target = nil)
-        #puts "load_from_json(#{tree}, #{target})"
+        puts "load_from_json(#{tree}, #{target})"
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
-          #puts "loading #{method} => #{value}"
+          puts "loading #{method} => #{value}"
           new_target = nil
           if !target
             load_from_json(value, Object.const_get(method))
           elsif method == "*all"
             target.replace value.collect { |id| target.proxy_association.klass.find(id) }
-            #puts "updated all values"
+            puts "updated all values"
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
             new_target = target.proxy_association.klass.find(method)
             target << new_target
-            #puts "#{new_target} pushed on collection"
+            puts "#{new_target} pushed on collection"
           elsif method.is_a? Array
-            target.send "#{method}=", method.first  # I THINK THIS SHOULD BE COMMENTED OUT ?????
+            #target.send "#{method}=", method.first  # I THINK THIS SHOULD BE COMMENTED OUT ?????
             new_target = target.send *method
-            #puts "target now = #{new_target}"
+            puts "target now = #{new_target}"
           elsif value.is_a? Array
             target.send "#{method}=", value.first
-            #puts "target.#{method} set to #{value.first}"
+            puts "target.#{method} set to #{value.first}"
           else
             new_target = target.send *method
             target.send "#{method}=", new_target rescue nil
-            #puts "target.#{method} set to #{new_target}"
+            puts "target.#{method} set to #{new_target}"
           end
           load_from_json(value, new_target) if new_target
         end
-        #puts "target will be saved? #{target.respond_to? :save}"
+        puts "target will be saved? #{target.respond_to? :save}"
         target.save if target.respond_to? :save 
       end
       

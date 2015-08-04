@@ -2,6 +2,7 @@ require 'spec/reactive_record_config'
 require 'react_js_test_only'
 require 'opal-react'
 require 'reactive_record'
+#require 'jquery'
 
 if false 
 rendering("a component", timeout: 5) do

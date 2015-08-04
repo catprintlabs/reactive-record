@@ -1,5 +1,7 @@
 if RUBY_ENGINE == 'opal'
-  require "reactive_record/cache"
+  require "reactive_record/server_data_cache"
+  require "reactive_record/active_record/reactive_record/while_loading"
+  require "reactive_record/active_record/reactive_record/isomorphic_base"
   require "reactive_record/active_record/aggregations"
   require "reactive_record/active_record/associations"
   require "reactive_record/active_record/reactive_record/base"
@@ -8,14 +10,13 @@ if RUBY_ENGINE == 'opal'
   require "reactive_record/active_record/instance_methods"
   require "reactive_record/active_record/base"
   require "reactive_record/interval"
-  require "reactive_record/server_data_cache"
 else
   require "opal"
   require "reactive_record/version"
   require "reactive_record/engine"
-  require "reactive_record/cache"
-  require "reactive_record/serializers"
   require "reactive_record/server_data_cache"
+  require "reactive_record/active_record/reactive_record/isomorphic_base"
+  require "reactive_record/serializers"
   module ActiveRecord::Associations::Builder
     class Association 
       def validate_options

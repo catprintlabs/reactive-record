@@ -1,10 +1,11 @@
 require 'spec/spec_helper'
 require 'user'
 require 'todo_item'
+require 'address'
 
 describe "integration with react" do
   
-  after(:each) { ReactiveRecord::Base.reset_records! }
+  before(:each) { React::IsomorphicHelpers.load_context }
 
   it "find by two methods will not give the same object until loaded" do
     r1 = User.find_by_email("mitch@catprint.com")
@@ -32,7 +33,7 @@ describe "integration with react" do
   end.should_immediately_generate do 
     html == "mitch@catprint.com"
   end
-  
+if false  
   rendering("an attribute from the server") do
     User.find_by_email("mitch@catprint.com").first_name
   end.should_generate do
@@ -62,6 +63,13 @@ describe "integration with react" do
   end.should_generate do
     puts "html = #{html}"
     html == "mitch@catprint.com"
+  end
+end
+  rendering("an aggregation") do
+    User.find_by_email("mitch@catprint.com").address.city
+  end.should_generate do
+    puts "html = #{html}"
+    html == "Rochester"
   end
   
 end

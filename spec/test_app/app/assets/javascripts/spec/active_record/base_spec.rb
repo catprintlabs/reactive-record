@@ -32,7 +32,7 @@ class Scoped < ActiveRecord::Base
 end
 
 describe "ActiveRecord" do
-  
+
   after(:each) { React::API.clear_component_class_cache }
   
   # uncomment if you are having trouble with tests failing.  One non-async test must pass for things to work
@@ -72,11 +72,11 @@ describe "ActiveRecord" do
     it "can find a record by id" do
       expect(BaseClass.find(12).id).to eq(12)
     end
-    
+
     it "has a find_by_xxx method" do
       expect(BaseClass.find_by_xxx("beer").xxx).to eq("beer")
     end
-    
+   
     it "will correctly infer the model type from the inheritance column" do
       expect(BaseClass.find_by_type("SubClass").class).to eq(SubClass)
       expect(BaseClass.find_by_type(nil).class).to eq(BaseClass)
@@ -114,7 +114,7 @@ describe "ActiveRecord" do
       expect(ar.attr2).to eq(2)
       expect(ar.id).to eq(123)
     end
-    
+
   end
   
 end

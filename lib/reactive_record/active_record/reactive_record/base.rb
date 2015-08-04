@@ -28,35 +28,6 @@ module ReactiveRecord
   
     attr_accessor :ar_instance
     attr_accessor :vector
-  
-    def self.records
-      @records ||= Hash.new { |hash, key| hash[key] = [] }
-    end
-    
-    def self.reset_records!  # primarly for testing
-      @records = nil
-    end
-    
-    def records
-      self.class.records
-    end
-      
-    def self.data_interface
-      @data_interface ||= React::PrerenderDataInterface.new
-    end
-
-    def self.fetch_from_db(*vector)
-      data_interface.fetch_from_db(vector) # because fetch_from_db is cross platform we can't use splat
-    end
-    
-    def self.find_in_db(*args)
-      data_interface.find_in_db(*args)
-    end
-    
-    def self.load_from_db(*vector)
-      data_interface.load_from_db(*vector)
-    end
-
     
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -72,9 +43,11 @@ module ReactiveRecord
     end
     
     def self.load_from_json(json, target = nil)
+      puts "loading from json"
       @data_loading = true
       ServerDataCache.load_from_json(json, target)
       @data_loading = false
+      puts "loaded #{@records}"
     end
   
     def self.find(model, attribute, value)  
@@ -84,13 +57,13 @@ module ReactiveRecord
         
       model = model.base_class
       # already have a record with this attribute-value pair?
-      record = records[model].detect { |record| record.attributes[attribute] == value}
+      record = @records[model].detect { |record| record.attributes[attribute] == value}
       # if not, and then the record may be loaded, but not have this attribute set yet,
       # so find the id of of record with the attribute-value pair, and see if that is loaded.
       # find_in_db returns nil if we are not prerendering which will force us to create a new record
       # because there is no way of knowing the id.
-      if !record and attribute != model.primary_key and id = find_in_db(model, model.primary_key, id)
-        record = records[model].detect { |record| record.id == id} 
+      if !record and attribute != model.primary_key and id = find_in_db(model, attribute, value)
+        record = @records[model].detect { |record| record.id == id} 
       end
       # if we don't have a record then create one
       (record = new(model)).vector = [model, ["find_by_#{attribute}", value]] unless record
@@ -113,7 +86,7 @@ module ReactiveRecord
     
       # do we already have a record with this vector?  If so return it, otherwise make a new one.
     
-      record = records[model].detect { |record| record.vector == vector}
+      record = @records[model].detect { |record| record.vector == vector}
       (record = new(model)).vector = vector unless record
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
     
@@ -124,7 +97,7 @@ module ReactiveRecord
       @attributes = hash
       @synced_attributes = {}
       @ar_instance = ar_instance
-      self.class.records[model] << self
+      records[model] << self
     end
   
     def find(*args)
@@ -213,14 +186,16 @@ module ReactiveRecord
           if association.collection? 
             Collection.new(association.klass, @ar_instance, association, *vector, method)
           else
-            find_association(association, (id and self.class.fetch_from_db(@model, [:find, id], method, @model.primary_key)))
+            find_association(association, (id and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
           end
         elsif aggregation = @model.reflect_on_aggregation(method)
           new_from_vector(aggregation.klass, self, *vector, method)
         elsif id  
-          self.class.fetch_from_db(@model, [:find, id], method) || self.class.load_from_db(*vector, method)
+          puts "fetching from db #{[@model, [:find, id], method]}"
+          self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
         else  # its a attribute in an aggregate or we are on the client and don't know the id
-          self.class.fetch_from_db(*vector, method) || self.class.load_from_db(*vector, method)
+          puts "**************aggregate fetch"
+          self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)
         end
       )
     end

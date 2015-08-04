@@ -13,9 +13,9 @@ module ReactiveRecord
     def all
       unless @collection
         @collection = []
-        if ids = ReactiveRecord::Base.fetch_from_db(*@vector, "*all")  
+        if ids = ReactiveRecord::Base.fetch_from_db([*@vector, "*all"])  
           ids.each do |id| 
-            @collection << @target_klass.find(@target_klass.primary_key => id) 
+            @collection << @target_klass.find_by(@target_klass.primary_key => id) 
           end
         else
           ReactiveRecord::Base.load_from_db(*@vector, "*all")

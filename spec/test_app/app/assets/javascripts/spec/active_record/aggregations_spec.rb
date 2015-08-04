@@ -12,7 +12,6 @@ end
 
 
 describe "ActiveRecord" do
-  
   after(:each) { React::API.clear_component_class_cache }
   
   # uncomment if you are having trouble with tests failing.  One non-async test must pass for things to work
