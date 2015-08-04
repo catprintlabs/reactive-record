@@ -12,7 +12,7 @@ else
   module ActiveRecord::Associations::Builder
     class Association #:nodoc:
       def validate_options
-        options.assert_valid_keys(self.class.valid_options + [:server_only])
+        options.assert_valid_keys(valid_options + [:server_only])
       end
     end
   end
