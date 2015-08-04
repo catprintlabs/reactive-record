@@ -13,15 +13,15 @@ Gem::Specification.new do |s|
   s.description = "Description of ReactiveRecord."
 
   s.files = Dir["{app,config,db,lib}/**/*"] + ["MIT-LICENSE", "Rakefile", "README.rdoc"]
-  
+
   # these options are in some other gems (i.e. opal-aasm) do we need them?
   #spec.bindir        = "exe"
   #spec.executables   = spec.files.grep(%r{^exe/}) { |f| File.basename(f) }
   #spec.require_paths = ["lib"]
-  
+
   s.test_files = Dir["spec-server/**/*"]
 
-  s.add_dependency "rails", "~> 3.2.13"
+  s.add_dependency "rails", ">= 3.2.13"
   # s.add_dependency "jquery-rails"
 
   s.add_development_dependency "sqlite3"
