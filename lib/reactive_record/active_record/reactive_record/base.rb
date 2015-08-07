@@ -19,7 +19,7 @@ module ReactiveRecord
     # Because there is no point in generating a new ar_instance everytime a search is made we cache the first ar_instance created.
     # Its possible however during loading to create a new ar_instances that will in the end point to the same record.
   
-    # VECTORS... are in important concept.  They are the substitute for a primary key before a record is loaded.
+    # VECTORS... are an important concept.  They are the substitute for a primary key before a record is loaded.
     # Vectors have the form [ModelClass, method_call, method_call, method_call...]
   
     # Each method call is either a simple method name or an array in the form [method_name, param, param ...]
@@ -28,6 +28,7 @@ module ReactiveRecord
   
     attr_accessor :ar_instance
     attr_accessor :vector
+    attr_accessor :model
     
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -58,19 +59,22 @@ module ReactiveRecord
       model = model.base_class
       # already have a record with this attribute-value pair?
       record = @records[model].detect { |record| record.attributes[attribute] == value}
-      # if not, and then the record may be loaded, but not have this attribute set yet,
-      # so find the id of of record with the attribute-value pair, and see if that is loaded.
-      # find_in_db returns nil if we are not prerendering which will force us to create a new record
-      # because there is no way of knowing the id.
-      if !record and attribute != model.primary_key and id = find_in_db(model, attribute, value)
-        record = @records[model].detect { |record| record.id == id} 
+      
+      unless record
+        # if not, and then the record may be loaded, but not have this attribute set yet,
+        # so find the id of of record with the attribute-value pair, and see if that is loaded.
+        # find_in_db returns nil if we are not prerendering which will force us to create a new record
+        # because there is no way of knowing the id.
+        if attribute != model.primary_key and id = find_in_db(model, attribute, value)
+          record = @records[model].detect { |record| record.id == id} 
+        end
+        # if we don't have a record then create one
+        (record = new(model)).vector = [model, ["find_by_#{attribute}", value]] unless record
+        # and set the value
+        record.sync_attribute(attribute, value)
+        # and set the primary if we have one
+        record.sync_attribute(model.primary_key, id) if id
       end
-      # if we don't have a record then create one
-      (record = new(model)).vector = [model, ["find_by_#{attribute}", value]] unless record
-      # and set the value
-      record.sync_attribute(attribute, value)
-      # and set the primary if we have one
-      record.sync_attribute(model.primary_key, id) if id
     
       # finally initialize and return the ar_instance
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
@@ -133,20 +137,45 @@ module ReactiveRecord
     end
   
     def reactive_get!(attribute)
-      apply_method(attribute) unless @attributes.has_key? attribute 
-      React::State.get_state(self, attribute) unless data_loading?
-      attributes[attribute]
+      unless @destroyed
+        apply_method(attribute) unless @attributes.has_key? attribute 
+        React::State.get_state(self, attribute) unless data_loading?
+        attributes[attribute]
+      end
     end
   
     def reactive_set!(attribute, value)
-      attributes[attribute] = value
-      React::State.set_state(self, attribute, value) unless data_loading?
+      unless @destroyed or attributes[attribute] == value
+        if association = @model.reflect_on_association(attribute) 
+          if association.collection? 
+            collection = Collection.new(association.klass, @ar_instance, association)
+            collection.replace(value)
+            value = collection
+          else
+            inverse_of = association.inverse_of
+            inverse_association = association.klass.reflect_on_association(inverse_of)
+            if inverse_association.collection?
+              if !value
+                attributes[attribute].attributes[inverse_of].delete(@ar_instance)
+              elsif value.attributes[inverse_of]
+                value.attributes[inverse_of] << @ar_instance
+              else
+                value.attributes[inverse_of] = Collection.new(@model, value, inverse_association)
+                value.attributes[inverse_of].replace [@ar_instance]
+              end
+            elsif value
+              attributes[attribute].attributes[inverse_of] = nil if attributes[attribute]
+              value.attributes[inverse_of] = @ar_instance 
+              React::State.set_state(value.instance_variable_get(:@backing_record), inverse_of, @ar_instance) unless data_loading?
+            else
+              attributes[attribute].attributes[inverse_of] = nil
+            end
+          end
+        end
+        attributes[attribute] = value
+        React::State.set_state(self, attribute, value) unless data_loading?
+      end
       value
-    end
-  
-    def get_state!
-      React::State.get_state(self, self) unless data_loading?
-      @state
     end
   
     def changed?(*args)
@@ -156,7 +185,10 @@ module ReactiveRecord
   
     def sync!(hash = {})
       @attributes.merge! hash
-      @synced_attributes = @attributes
+      @synced_attributes = @attributes.dup
+      puts "setting saving to false"
+      @saving = false
+      React::State.set_state(self, self, :synced) unless data_loading?
       self
     end
   
@@ -164,119 +196,74 @@ module ReactiveRecord
       #puts "syncing attribute"
       @synced_attributes[attribute] = attributes[attribute] = value
     end
+    
+    def saving! 
+      puts "setting saving to true"
+      React::State.set_state(self, self, :saving) unless data_loading?
+      @saving = true
+    end
+    
+    def saving?
+      puts "getting saving? #{@saving}"
+      React::State.get_state(self, self)
+      @saving
+    end
   
     def find_association(association, id)
+      
       inverse_of = association.inverse_of
+      
       instance = if id
         find(association.klass, association.klass.primary_key, id)
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
-      instance.instance_eval { @backing_record.attributes[inverse_of] = self.ar_instance} if inverse_of
+      
+      instance_backing_record_attributes = instance.instance_variable_get(:@backing_record).attributes
+      inverse_association = association.klass.reflect_on_association(inverse_of)
+      
+      if inverse_association.collection?
+        puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        instance_backing_record_attributes[inverse_of] = if id and id != ""
+          Collection.new(@model, instance, inverse_association, association.klass, ["find", id], inverse_of) 
+        else
+          Collection.new(@model, instance, inverse_association, *vector, association.attribute, inverse_of) 
+        end unless instance_backing_record_attributes[inverse_of]
+        instance_backing_record_attributes[inverse_of].replace [@ar_instance]
+      else
+        instance_backing_record_attributes[inverse_of] = @ar_instance 
+      end if inverse_of
+      
       instance
     end
         
     def apply_method(method)
-    
+      puts "#{@ar_instance}.apply_method(#{method})"
       # Fills in the value returned by sending "method" to the corresponding server side db instance
-      return unless id or vector  # record is "new" so just return, we really want to somehow get default values?  Possible?
-      sync_attribute(
-        method, 
-        if association = @model.reflect_on_association(method)
-          if association.collection? 
-            Collection.new(association.klass, @ar_instance, association, *vector, method)
-          else
-            find_association(association, (id and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
-          end
-        elsif aggregation = @model.reflect_on_aggregation(method)
-          new_from_vector(aggregation.klass, self, *vector, method)
-        elsif id  
-          puts "fetching from db #{[@model, [:find, id], method]}"
-          self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
-        else  # its a attribute in an aggregate or we are on the client and don't know the id
-          puts "**************aggregate fetch"
-          self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)
-        end
-      )
-    end
-  
-    def save(&block) 
-      
-      if data_loading?
-        
-        sync!
-        
-      elsif changed?
-      
-        records_to_process = [self]
-        models = []
-        associations = []
-        backing_records = {}
-      
-        add_new_association = lambda do |record, attribute, assoc_record|
-          if assoc_record.changed?
-            unless backing_records[assoc_record.object_id]
-              records_to_process << assoc_record
-              backing_records[assoc_record.object_id] = assoc_record
-            end
-            associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
-          end
-        end
-      
-        record_index = 0
-        while(record_index < records_to_process.count)
-          record = records_to_process[record_index]
-          output_attributes = {}
-          models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes}
-          record.attributes.each do |attribute, value|
-            if association = record.model.reflect_on_association(attribute)
-              if association.collection? 
-                value.each { |assoc| add_new_association.call record, attribute, assoc.instance_eval { @backing_record } }
-              else
-                add_new_association.call record, record, attribute, value.instance_eval { @backing_record }
-              end
+      if id or vector
+        sync_attribute(
+          method, 
+          if association = @model.reflect_on_association(method)
+            if association.collection? 
+              Collection.new(association.klass, @ar_instance, association, *vector, method)
             else
-              output_attributes[attribute] = value
+              find_association(association, (id and id != "" and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
             end
+          elsif aggregation = @model.reflect_on_aggregation(method)
+            puts "WE KNOW ITS AN AGGREVATION"
+            new_from_vector(aggregation.klass, self, *vector, method)
+          elsif id and id != "" 
+            puts "fetching from db #{[@model, [:find, id], method]}"
+            self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
+          else  # its a attribute in an aggregate or we are on the client and don't know the id
+            self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)
           end
-          records_to_process_index += 1
-        end
-      
-        backing_records.each { |id, record| record.saving! }
-      
-        HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
-          response.json[:saved_models].each do |item|
-            internal_id, klass, attributes = item
-            backing_records[internal_id].sync!(attributes)
-          end
-          yield response.json[:success], response.json[:message] if block
-        end
+        )
+      elsif association = @model.reflect_on_association(method) and association.collection?
+        @attributes[method] = Collection.new(association.klass, @ar_instance, association)
+      elsif aggregation = @model.reflect_on_aggregation(method)
+        @attributes[method] = aggregation.klass.new
       end
-    end
-  
-    def destroy(&block)
-    
-      return if @destroyed
-    
-      model.reflect_on_associations.each do |association|
-        if association.collection? 
-          attributes[association.attribute].delete(ar_instance)
-        elsif owner = attributes[association.attribute] and inverse_of = association.inverse_of
-          owner.attributes[inverse_of.attribute] = nil
-        end
-      end
-    
-      if id
-        HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: model_name, id: @backing_record[primary_key]}).then do |response|
-          @backing_record.delete
-          yield response.json[:success], response.json[:message] if block
-        end
-      else
-        yield true, nil
-      end
-    
-      @destroyed = true
-    
     end
   
     def self.infer_type_from_hash(klass, hash)

@@ -33,7 +33,7 @@ describe "integration with react" do
   end.should_immediately_generate do 
     html == "mitch@catprint.com"
   end
-if false  
+ 
   rendering("an attribute from the server") do
     User.find_by_email("mitch@catprint.com").first_name
   end.should_generate do
@@ -50,21 +50,22 @@ if false
     html == "a todo for mitch, another todo for mitch"
   end
   
-  rendering("a belongs_to association") do
+  rendering("a belongs_to association from id") do
+    puts "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@rendering from id"
     #User.find_by_email("mitch@catprint.com").todo_items.first.user.email
     TodoItem.find(1).user.email
   end.should_generate do
-    puts "html = #{html}"
+    puts "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@html = #{html}"
     html == "mitch@catprint.com"
   end
   
-  rendering("a belongs_to association") do
+  rendering("a belongs_to association from an attribute") do
     User.find_by_email("mitch@catprint.com").todo_items.first.user.email
   end.should_generate do
     puts "html = #{html}"
     html == "mitch@catprint.com"
   end
-end
+
   rendering("an aggregation") do
     User.find_by_email("mitch@catprint.com").address.city
   end.should_generate do

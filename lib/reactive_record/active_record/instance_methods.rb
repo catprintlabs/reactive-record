@@ -47,7 +47,6 @@ module ActiveRecord
       elsif args.count == 1 && name =~ /=$/ && !block
         attribute_name = name.gsub(/=$/,"")
         @backing_record.reactive_set!(attribute_name, args[0])
-        args[0]
       elsif args.count == 0 && !block
         @backing_record.reactive_get!(name) 
       else
@@ -57,6 +56,10 @@ module ActiveRecord
     
     def save(&block) 
       @backing_record.save &block
+    end
+    
+    def saving?
+      @backing_record.saving?
     end
     
     def destroy(&block)

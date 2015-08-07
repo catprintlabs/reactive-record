@@ -230,7 +230,7 @@ module ReactiveRecord
         puts "load_from_json(#{tree}, #{target})"
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
-          puts "loading #{method} => #{value}"
+          puts "loading #{target} #{method} => #{value}"
           new_target = nil
           if !target
             load_from_json(value, Object.const_get(method))
@@ -240,22 +240,32 @@ module ReactiveRecord
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
             new_target = target.proxy_association.klass.find(method)
             target << new_target
-            puts "#{new_target} pushed on collection"
+            puts "#{new_target} pushed on collection #{target}"
           elsif method.is_a? Array
             #target.send "#{method}=", method.first  # I THINK THIS SHOULD BE COMMENTED OUT ?????
             new_target = target.send *method
             puts "target now = #{new_target}"
           elsif value.is_a? Array
             target.send "#{method}=", value.first
-            puts "target.#{method} set to #{value.first}"
+            puts "#{target}.#{method} set to #{value.first}"
+          elsif value.is_a? Hash and value[:id] and value[:id].first
+            new_target = target.class.reflect_on_association(method).klass.find(value[:id].first)
+            target.send "#{method}=", new_target
+            puts "#{target}.#{method} set to #{new_target}"
           else
             new_target = target.send *method
-            target.send "#{method}=", new_target rescue nil
-            puts "target.#{method} set to #{new_target}"
+            begin 
+              new_target = target.send "#{method}=", new_target
+              puts "#{target}.#{method} set to #{new_target}"
+            rescue Exception => e
+              message = "FAILED #{target}.#{method} not set to #{new_target}"
+              `console.error(message)`
+            end
           end
           load_from_json(value, new_target) if new_target
         end
-        puts "target will be saved? #{target.respond_to? :save}"
+        puts "target #{target} will be saved? #{target.respond_to? :save}"
+        #{}`debugger`
         target.save if target.respond_to? :save 
       end
       

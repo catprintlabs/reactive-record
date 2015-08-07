@@ -13,10 +13,91 @@ end.should_generate do |component|
 end
 end
 
+class Object
+    
+  def use_case(*args, &block)
+    describe(*args) do
+      clear_opal_rspec_runners
+      instance_eval &block
+      last_promise = nil
+      it "test starting" do
+        expect(true).to be_truthy
+      end
+      opal_rspec_runners.reverse.each do |type, title, opts, block, promise|
+        promise_to_resolve = last_promise
+        async(title, opts) do
+          promise.then do
+            puts "*********************** running #{type} #{title} **************************"
+            Opal::RSpec::AsyncHelpers::ClassMethods.set_current_promise self, promise_to_resolve
+            begin
+              instance_eval &block if block
+            rescue Exception => e
+              message = "Failed to run #{type} #{title}\nTest raised exception before starting test block: #{e}"
+              `console.error(#{message})`
+            end
+          end
+        end
+        last_promise = promise
+      end
+      last_promise.resolve
+    end
+  end
+      
+end
+
 module Opal
   module RSpec
     module AsyncHelpers
       module ClassMethods
+        
+        def self.set_current_promise(instance, promise)
+          @current_promise = promise
+          @current_promise_test_instance = instance
+        end
+        
+        def self.resolve_current_promise
+          @current_promise.resolve if @current_promise
+        end
+        
+        def self.get_current_promise_test_instance
+          @current_promise_test_instance
+        end
+        
+        #alias_method :old_it, :it
+        
+        #def it(*args, &block)
+        #  @previous_promise = new_promise
+        #  old_it(*args, &block)
+        #end
+        
+        def opal_rspec_runners
+          @opal_rspec_runners
+        end
+
+        def clear_opal_rspec_runners
+          @opal_rspec_runners = []
+        end
+
+        def opal_rspec_push_runner(type, title, opts, block)
+          @opal_rspec_runners << [type, title, opts, block, Promise.new]
+        end
+                  
+        
+        def first_it(title, opts = {}, &block)
+          opal_rspec_push_runner("first_it", title, opts, block)
+        end
+        
+        def now_it(title, opts = {}, &block)
+          opal_rspec_push_runner("now_it", title, opts, block)
+        end
+        
+        def and_it(title, opts = {}, &block)
+          opal_rspec_push_runner("and_it", title, opts, block)
+        end
+        
+        def finally(title, opts = {}, &block)
+          opal_rspec_push_runner("finally", title, opts, block)
+        end
         
         def rendering(title, &block)
           klass = Class.new do
@@ -110,7 +191,36 @@ module ReactTestHelpers
     element = build_element component_class, opts
     check_block.call
   end
+  
+  def test(&block)
+    run_async &block 
+    Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+  end
     
+end
+
+class Promise
+  
+  def then_test(&block)
+    self.then do |*args| 
+      puts "then_test promise resolved"
+      Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async do 
+        puts "running async"
+        yield *args
+        puts "done running async"
+        Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+        puts "resolved next promise"
+      end
+    end
+  end
+  
+  def while_waiting(&block) 
+    self.then do
+      Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+    end
+    Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async &block
+  end
+  
 end
 
 RSpec.configure do |config|

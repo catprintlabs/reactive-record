@@ -1,16 +1,23 @@
 module ReactiveRecord
 
+  # will repeatedly execute the block until it is loaded
+  # immediately returns a promise that will resolve once the block is loaded
+
   def self.load(&block)
+    puts "reactive record.load"
     promise = Promise.new
     @load_stack ||= []
     @load_stack << @loads_pending
     @loads_pending = nil
-    block.call
+    puts "calling block"
+    result = block.call
+    puts "block called loads pending = #{@loads_pending}"
     if @loads_pending
       @blocks_to_load ||= []
       @blocks_to_load << [promise, block]
+      puts "!!!!!!!!!!!!!pushed another block on #{@blocks_to_load.count if @blocks_to_load}"
     else
-      promise.resolve
+      promise.resolve result
     end
     @loads_pending = @load_stack.pop
     promise
@@ -21,18 +28,27 @@ module ReactiveRecord
   end
 
   def self.run_blocks_to_load
+    puts "!!!!!!!!!!!!!running blocks to load #{@blocks_to_load.count if @blocks_to_load}"
     if @blocks_to_load
-      @blocks_to_load = @blocks_to_load.collect do |promise_and_block|
+      blocks_to_load = @blocks_to_load
+      @blocks_to_load = []
+      blocks_to_load.each do |promise_and_block|
         @loads_pending = nil
-        block.call
+        puts "calling blocks to load again"
+        result = promise_and_block.last.call
+        puts "call did return!!!!!!!!! <#{@loads_pending}>"
         if @loads_pending
-          promise_and_block
+          @blocks_to_load << promise_and_block
         else
-          promise.resolve
-          nil
+          puts "resolving the block to load promise with #{result}"
+          promise_and_block.first.resolve result
+          puts "block to load promise did return"
         end
-      end.compact
+      end
+      puts "all done rerunning blocks now we have #{@blocks_to_load.count if @blocks_to_load} blocks to load"
     end
+  rescue Exception => e
+    puts "run blocks to load dying at #{e}"
   end
 
   
