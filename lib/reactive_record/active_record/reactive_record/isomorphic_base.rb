@@ -97,6 +97,10 @@ module ReactiveRecord
       puts "schedule_fetch Exception #{e.message}"
     end
     
+    def self.get_type_hash(record)
+      {record.class.inheritance_column => record[record.class.inheritance_column]}
+    end
+    
     # save records
     
     if RUBY_ENGINE == 'opal'

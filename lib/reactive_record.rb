@@ -17,13 +17,13 @@ else
   require "reactive_record/server_data_cache"
   require "reactive_record/active_record/reactive_record/isomorphic_base"
   require "reactive_record/serializers"
-  module ActiveRecord::Associations::Builder
-    class Association 
-      def validate_options
-        options.assert_valid_keys(self.class.valid_options + [:server_only])
-      end
-    end
-  end
+  #module ActiveRecord::Associations::Builder
+  #  class Association 
+  #    def validate_options
+  #      options.assert_valid_keys(self.class.valid_options + [:server_only])
+  #    end
+  #  end
+  #end
   begin  # can't figure out how to make this work when gem is released...
     #require "../../config/routes.rb"
     #require "../../app/controllers/reactive_record/reactive_record_controller"

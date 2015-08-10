@@ -83,7 +83,8 @@ module ActiveRecord
     [
       "table_name=", "before_validation", "with_options", "validates_presence_of", "validates_format_of", 
       "accepts_nested_attributes_for", "after_create", "before_save", "before_destroy", "where", "validate", 
-      "attr_protected", "validates_numericality_of", "default_scope", "has_attached_file", "attr_accessible"
+      "attr_protected", "validates_numericality_of", "default_scope", "has_attached_file", "attr_accessible",
+      "serialize"
     ].each do |method|
       define_method(method.to_s) { |*args, &block| }
     end

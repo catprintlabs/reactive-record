@@ -149,7 +149,7 @@ module ReactiveRecord
         if association = @model.reflect_on_association(attribute) 
           if association.collection? 
             collection = Collection.new(association.klass, @ar_instance, association)
-            collection.replace(value)
+            collection.replace(value || [])
             value = collection
           else
             inverse_of = association.inverse_of
@@ -197,6 +197,12 @@ module ReactiveRecord
       @synced_attributes[attribute] = attributes[attribute] = value
     end
     
+    def revert
+      @attributes.each do |attribute, value|
+        @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
+      end
+    end
+    
     def saving! 
       puts "setting saving to true"
       React::State.set_state(self, self, :saving) unless data_loading?
@@ -238,7 +244,6 @@ module ReactiveRecord
     end
         
     def apply_method(method)
-      puts "#{@ar_instance}.apply_method(#{method})"
       # Fills in the value returned by sending "method" to the corresponding server side db instance
       if id or vector
         sync_attribute(
