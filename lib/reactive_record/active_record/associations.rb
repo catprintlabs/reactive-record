@@ -3,7 +3,7 @@ module ActiveRecord
   class Base
     
     def self.reflect_on_all_associations
-      base_class.instance_eval { @associations ||= [] }
+      base_class.instance_eval { @associations ||= superclass.instance_eval { (@associations && @associations.dup) || [] } }
     end
     
     def self.reflect_on_association(attribute)
@@ -21,6 +21,7 @@ module ActiveRecord
       attr_reader :macro
             
       def initialize(owner_class, macro, name, options = {})
+        #puts "new association reflection ()#{owner_class}, #{macro}, #{name}, #{options}) #{owner_class.reflect_on_all_associations}"
         owner_class.reflect_on_all_associations << self
         @owner_class = owner_class
         @macro =       macro
@@ -30,7 +31,11 @@ module ActiveRecord
       end
       
       def inverse_of
-        @inverse_of ||= klass.reflect_on_all_associations.detect { | association | association.association_foreign_key == @association_foreign_key }.attribute
+        unless @inverse_of
+          inverse_association = klass.reflect_on_all_associations.detect { | association | association.association_foreign_key == @association_foreign_key }
+          raise "Association #{@owner_class}.#{attribute} (foreign_key: #{@association_foreign_key}) has no inverse in #{@klass_name}" unless inverse_association
+          @inverse_of = inverse_association.attribute
+        end
       end
       
       def klass

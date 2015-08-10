@@ -33,6 +33,10 @@ module ActiveRecord
       self.class.model_name
     end
     
+    def revert
+      @backing_record.revert
+    end
+    
     def changed?
       @backing_record.changed?
     end

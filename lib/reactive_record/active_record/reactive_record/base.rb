@@ -81,7 +81,7 @@ module ReactiveRecord
     end
   
     def self.new_from_vector(model, aggregate_parent, *vector)
-    
+      #puts "new_from_vector()" #{}"#{model}, #{aggregate_parent}, [#{vector}])"
       # this is the equivilent of find but for associations and aggregations
       # because we are not fetching a specific attribute yet, there is NO communication with the 
       # server.  That only happens during find.
@@ -91,8 +91,11 @@ module ReactiveRecord
       # do we already have a record with this vector?  If so return it, otherwise make a new one.
     
       record = @records[model].detect { |record| record.vector == vector}
+      #puts "got the record: #{record}"
       (record = new(model)).vector = vector unless record
+      #puts "now got the record for sure #{record}"
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
+      #puts "all done"
     
     end
     
@@ -216,7 +219,7 @@ module ReactiveRecord
     end
   
     def find_association(association, id)
-      
+      #puts "find_association(#{association}, #{id})"
       inverse_of = association.inverse_of
       
       instance = if id
@@ -224,22 +227,26 @@ module ReactiveRecord
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
+      #puts "got the instance: #{instance}"
       
       instance_backing_record_attributes = instance.instance_variable_get(:@backing_record).attributes
       inverse_association = association.klass.reflect_on_association(inverse_of)
-      
+      #puts "got the inverse association"
       if inverse_association.collection?
-        puts "!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+        #puts "inverse association is a collection"
         instance_backing_record_attributes[inverse_of] = if id and id != ""
           Collection.new(@model, instance, inverse_association, association.klass, ["find", id], inverse_of) 
         else
           Collection.new(@model, instance, inverse_association, *vector, association.attribute, inverse_of) 
         end unless instance_backing_record_attributes[inverse_of]
         instance_backing_record_attributes[inverse_of].replace [@ar_instance]
+        #puts "updated collection"
       else
+        #puts "inverse association is not a collection"
         instance_backing_record_attributes[inverse_of] = @ar_instance 
+        #puts "updated inverse"
       end if inverse_of
-      
+      #puts "all done"
       instance
     end
         

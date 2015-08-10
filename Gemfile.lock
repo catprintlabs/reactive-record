@@ -14,15 +14,14 @@ PATH
     reactive_record (0.2.4)
       opal-browser
       opal-rails
-      pry
-      rails (~> 3.2.13)
+      rails (>= 3.2.13)
       react-rails
       therubyracer
 
 PATH
   remote: ../opal-react
   specs:
-    opal-react (0.2.2)
+    opal-react (0.3.0)
       opal
       opal-activesupport
 
@@ -196,10 +195,11 @@ DEPENDENCIES
   opal!
   opal-browser
   opal-react!
+  pry
   react-rails!
   reactive_record!
   rspec-rails
   sqlite3
 
 BUNDLED WITH
-   1.10.2
+   1.10.6
