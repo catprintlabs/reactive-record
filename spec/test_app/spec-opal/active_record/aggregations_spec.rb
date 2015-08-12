@@ -1,6 +1,6 @@
-require 'spec/spec_helper'
+require 'spec_helper'
 #require 'active_record'
-
+#Opal::RSpec::Runner.autorun
 
 class Thing < ActiveRecord::Base
 end

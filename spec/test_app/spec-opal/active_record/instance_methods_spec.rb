@@ -1,12 +1,7 @@
-require 'spec/spec_helper'
-#require 'active_record'
-
-
+require 'spec_helper'
+#Opal::RSpec::Runner.autorun
 class Thing < ActiveRecord::Base
 end
-
-
-
 
 describe "ActiveRecord" do
   let(:instance) { Thing.new({attr1: 1, attr2: 2, id: 123}) }

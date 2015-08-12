@@ -1,5 +1,5 @@
-require 'spec/spec_helper'
-#require 'active_record'
+require 'spec_helper'
+#Opal::RSpec::Runner.autorun
 
 class BaseClass < ActiveRecord::Base
 end

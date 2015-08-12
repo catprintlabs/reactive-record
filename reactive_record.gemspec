@@ -33,4 +33,5 @@ Gem::Specification.new do |s|
   s.add_dependency "opal-browser"
   s.add_dependency 'react-rails'
   s.add_dependency 'therubyracer'
+  s.add_dependency 'opal-react'
 end

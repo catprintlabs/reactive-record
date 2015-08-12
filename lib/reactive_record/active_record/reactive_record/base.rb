@@ -44,11 +44,9 @@ module ReactiveRecord
     end
     
     def self.load_from_json(json, target = nil)
-      puts "loading from json"
       @data_loading = true
       ServerDataCache.load_from_json(json, target)
       @data_loading = false
-      puts "loaded #{@records}"
     end
   
     def self.find(model, attribute, value)  
@@ -81,7 +79,6 @@ module ReactiveRecord
     end
   
     def self.new_from_vector(model, aggregate_parent, *vector)
-      #puts "new_from_vector()" #{}"#{model}, #{aggregate_parent}, [#{vector}])"
       # this is the equivilent of find but for associations and aggregations
       # because we are not fetching a specific attribute yet, there is NO communication with the 
       # server.  That only happens during find.
@@ -91,11 +88,8 @@ module ReactiveRecord
       # do we already have a record with this vector?  If so return it, otherwise make a new one.
     
       record = @records[model].detect { |record| record.vector == vector}
-      #puts "got the record: #{record}"
       (record = new(model)).vector = vector unless record
-      #puts "now got the record for sure #{record}"
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
-      #puts "all done"
     
     end
     
@@ -182,44 +176,50 @@ module ReactiveRecord
     end
   
     def changed?(*args)
-      args.count == 0 ? React::State.get_state(self, self) : React::State.get_state(@attributes, args[0])
-      @attributes != @synced_attributes and (args.count == 0 or @attributes[args[0]] != @synced_attributes[args[0]])
+      if args.count == 0
+        React::State.get_state(self, self)
+        @attributes != @synced_attributes
+      else
+        key = args[0]
+        React::State.get_state(@attributes, key)
+        @attributes.has_key?(key) != @synced_attributes.has_key?(key) or @attributes[key] != @synced_attributes[key]
+      end
     end
   
     def sync!(hash = {})
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
-      puts "setting saving to false"
+      @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup if value.is_a? Collection }
       @saving = false
       React::State.set_state(self, self, :synced) unless data_loading?
       self
     end
   
     def sync_attribute(attribute, value)
-      #puts "syncing attribute"
       @synced_attributes[attribute] = attributes[attribute] = value
+      @synced_attributes[attribute] = value.dup if value.is_a? ReactiveRecord::Collection
+      value
     end
     
     def revert
       @attributes.each do |attribute, value|
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
       end
+      @attributes.delete_if { |attribute, value| !@synced_attributes.has_key?(attribute) }
     end
     
     def saving! 
-      puts "setting saving to true"
       React::State.set_state(self, self, :saving) unless data_loading?
       @saving = true
     end
     
     def saving?
-      puts "getting saving? #{@saving}"
       React::State.get_state(self, self)
       @saving
     end
   
     def find_association(association, id)
-      #puts "find_association(#{association}, #{id})"
+      
       inverse_of = association.inverse_of
       
       instance = if id
@@ -227,26 +227,20 @@ module ReactiveRecord
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
-      #puts "got the instance: #{instance}"
       
       instance_backing_record_attributes = instance.instance_variable_get(:@backing_record).attributes
       inverse_association = association.klass.reflect_on_association(inverse_of)
-      #puts "got the inverse association"
+
       if inverse_association.collection?
-        #puts "inverse association is a collection"
         instance_backing_record_attributes[inverse_of] = if id and id != ""
           Collection.new(@model, instance, inverse_association, association.klass, ["find", id], inverse_of) 
         else
           Collection.new(@model, instance, inverse_association, *vector, association.attribute, inverse_of) 
         end unless instance_backing_record_attributes[inverse_of]
         instance_backing_record_attributes[inverse_of].replace [@ar_instance]
-        #puts "updated collection"
       else
-        #puts "inverse association is not a collection"
         instance_backing_record_attributes[inverse_of] = @ar_instance 
-        #puts "updated inverse"
       end if inverse_of
-      #puts "all done"
       instance
     end
         
@@ -262,10 +256,8 @@ module ReactiveRecord
               find_association(association, (id and id != "" and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
             end
           elsif aggregation = @model.reflect_on_aggregation(method)
-            puts "WE KNOW ITS AN AGGREVATION"
             new_from_vector(aggregation.klass, self, *vector, method)
           elsif id and id != "" 
-            puts "fetching from db #{[@model, [:find, id], method]}"
             self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
           else  # its a attribute in an aggregate or we are on the client and don't know the id
             self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)

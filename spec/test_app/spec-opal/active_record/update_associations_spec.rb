@@ -1,4 +1,4 @@
-require 'spec/spec_helper'
+require 'spec_helper'
 require 'user'
 require 'todo_item'
 require 'address'
@@ -42,7 +42,6 @@ use_case "updating associations" do
   
   and_it "will have the correct titles" do
     ReactiveRecord.load do
-      puts "loading #{User.find_by_first_name("Jon")}.todos #{User.find_by_first_name("Jon").todo_items}"
       User.find_by_first_name("Jon").todo_items.collect { | todo | todo.title }
     end.then_test do | titles |
       expect(titles).to eq(["Jon's first todo!"])
@@ -51,8 +50,7 @@ use_case "updating associations" do
 
   and_it "can by found by its owner" do
     todo = TodoItem.find_by_title("Jon's first todo!")
-    puts "got a todo = #{todo}"
-    test { puts "in test"; expect(todo.user.first_name).to eq("Jon") }
+    test { expect(todo.user.first_name).to eq("Jon") }
   end
   
   now_it "can be moved to another owner, and it will be removed from the old owner" do
@@ -84,7 +82,6 @@ use_case "updating associations" do
   end
   
   now_it "can be deleted" do
-    puts "jans todo = #{User.find_by_first_name("Jan").todo_items.first.title}"
     User.find_by_first_name("Jan").todo_items.first.destroy.then_test do
       expect(User.find_by_first_name("Jan").todo_items).to be_empty
     end

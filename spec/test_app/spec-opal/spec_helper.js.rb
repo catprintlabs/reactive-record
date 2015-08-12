@@ -1,16 +1,16 @@
-require 'spec/reactive_record_config'
+require 'opal'
+require 'opal-rspec'
+require 'reactive_record_config'
 require 'react_js_test_only'
 require 'opal-react'
 require 'reactive_record'
-#require 'jquery'
+require 'jquery'
+require 'opal-jquery'
 
-if false 
-rendering("a component", timeout: 5) do
-  puts "simplified!"
-  span {"hello"}
-end.should_generate do |component|
-  component.html == "hello"
-end
+
+#Opal::RSpec::Runner.autorun
+Document.ready? do
+  Opal::RSpec::Runner.autorun
 end
 
 class Object
@@ -27,7 +27,8 @@ class Object
         promise_to_resolve = last_promise
         async(title, opts) do
           promise.then do
-            puts "*********************** running #{type} #{title} **************************"
+            message = "               running #{type.gsub('_',' ')} #{title}"
+            `console.warn(#{message})`
             Opal::RSpec::AsyncHelpers::ClassMethods.set_current_promise self, promise_to_resolve
             begin
               instance_eval &block if block
@@ -203,13 +204,9 @@ class Promise
   
   def then_test(&block)
     self.then do |*args| 
-      puts "then_test promise resolved"
       Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async do 
-        puts "running async"
         yield *args
-        puts "done running async"
         Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
-        puts "resolved next promise"
       end
     end
   end

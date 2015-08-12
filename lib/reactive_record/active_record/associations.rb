@@ -21,7 +21,6 @@ module ActiveRecord
       attr_reader :macro
             
       def initialize(owner_class, macro, name, options = {})
-        #puts "new association reflection ()#{owner_class}, #{macro}, #{name}, #{options}) #{owner_class.reflect_on_all_associations}"
         owner_class.reflect_on_all_associations << self
         @owner_class = owner_class
         @macro =       macro
@@ -36,6 +35,7 @@ module ActiveRecord
           raise "Association #{@owner_class}.#{attribute} (foreign_key: #{@association_foreign_key}) has no inverse in #{@klass_name}" unless inverse_association
           @inverse_of = inverse_association.attribute
         end
+        @inverse_of
       end
       
       def klass

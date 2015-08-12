@@ -4,18 +4,14 @@ module ReactiveRecord
   # immediately returns a promise that will resolve once the block is loaded
 
   def self.load(&block)
-    puts "reactive record.load"
     promise = Promise.new
     @load_stack ||= []
     @load_stack << @loads_pending
     @loads_pending = nil
-    puts "calling block"
     result = block.call
-    puts "block called loads pending = #{@loads_pending}"
     if @loads_pending
       @blocks_to_load ||= []
       @blocks_to_load << [promise, block]
-      puts "!!!!!!!!!!!!!pushed another block on #{@blocks_to_load.count if @blocks_to_load}"
     else
       promise.resolve result
     end
@@ -28,27 +24,22 @@ module ReactiveRecord
   end
 
   def self.run_blocks_to_load
-    puts "!!!!!!!!!!!!!running blocks to load #{@blocks_to_load.count if @blocks_to_load}"
     if @blocks_to_load
       blocks_to_load = @blocks_to_load
       @blocks_to_load = []
       blocks_to_load.each do |promise_and_block|
         @loads_pending = nil
-        puts "calling blocks to load again"
         result = promise_and_block.last.call
-        puts "call did return!!!!!!!!! <#{@loads_pending}>"
         if @loads_pending
           @blocks_to_load << promise_and_block
         else
-          puts "resolving the block to load promise with #{result}"
           promise_and_block.first.resolve result
-          puts "block to load promise did return"
         end
       end
-      puts "all done rerunning blocks now we have #{@blocks_to_load.count if @blocks_to_load} blocks to load"
     end
   rescue Exception => e
-    puts "run blocks to load dying at #{e}"
+    message = "ReactiveRecord.run_blocks_to_load exception raised: #{e}"
+    `console.error(#{message})`
   end
 
   
@@ -101,7 +92,6 @@ module ReactiveRecord
         end
             
         def loading!
-          #puts "loading! current_observer: #{React::State.current_observer}"
           React::RenderingContext.waiting_on_resources = true
           React::State.get_state(self, :loaded_at)
           @is_loading = true
@@ -147,7 +137,6 @@ module ReactiveRecord
       end
     
       def render
-        #puts "#{self}.render loading: #{loading} waiting_on_resources: #{waiting_on_resources}"
         props = element_props.dup
         classes = [props[:class], props[:className], "reactive_record_while_loading_container_#{@uniq_id}"].compact.join(" ")
         props.merge!({
@@ -179,7 +168,6 @@ module React
         buffer << result.to_s if result.is_a? String
         buffer.dup
       end if loading_display_block 
-      puts "doing the whileloading thing in element"
       RenderingContext.replace(
         self,
         React.create_element(
@@ -203,7 +191,6 @@ module React
     alias_method :original_component_did_mount, :component_did_mount
     
     def component_did_mount(*args)
-      #puts "#{self}.component_did_mount"
       original_component_did_mount(*args)
       reactive_record_link_to_enclosing_while_loading_container
       reactive_record_link_set_while_loading_container_class
@@ -212,7 +199,6 @@ module React
     alias_method :original_component_did_update, :component_did_update
     
     def component_did_update(*args)
-      #puts "#{self}.component_did_update"
       original_component_did_update(*args)
       reactive_record_link_set_while_loading_container_class
     end

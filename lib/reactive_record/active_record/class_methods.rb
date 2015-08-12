@@ -50,7 +50,6 @@ module ActiveRecord
     end
     
     def method_missing(name, *args, &block)
-      #puts "#{self.name}.#{name}(#{args}) (called class method missing)"
       if args.count == 1 && name =~ /^find_by_/ && !block
         find_by(name.gsub(/^find_by_/, "") => args[0])
       else

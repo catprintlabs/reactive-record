@@ -8,8 +8,8 @@ users.each do |first_name, last_name, email|
   User.create({
     first_name: first_name, last_name: last_name, email: email, 
     address_street: "4348 Culver Road", address_city: "Rochester", address_state: "NY", address_zip: "14617"
-    }, 
-    without_protection: true
+    } 
+    #without_protection: true
   )
 end
 
@@ -20,5 +20,5 @@ todo_items = [
   ]
 
 todo_items.each do |attributes|
-  TodoItem.create(attributes, without_protection: true)
+  TodoItem.create(attributes) #, without_protection: true)
 end

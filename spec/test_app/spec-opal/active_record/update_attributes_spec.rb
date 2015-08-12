@@ -1,4 +1,4 @@
-require 'spec/spec_helper'
+require 'spec_helper'
 require 'user'
 require 'todo_item'
 require 'address'

@@ -47,7 +47,7 @@ module Dummy
     # This will create an empty whitelist of attributes available for mass-assignment for all models
     # in your app. As such, your models will need to explicitly whitelist or blacklist accessible
     # parameters by using an attr_accessible or attr_protected declaration.
-    config.active_record.whitelist_attributes = true
+    #config.active_record.whitelist_attributes = true
 
     # Enable the asset pipeline
     config.assets.enabled = true
@@ -55,6 +55,18 @@ module Dummy
 
     # Version of your assets, change this if you want to expire all your assets
     config.assets.version = '1.0'
+    
+    # These are the available opal-rspec options with their default value:
+    config.opal.method_missing      = true
+    config.opal.optimized_operators = true
+    config.opal.arity_check         = false
+    config.opal.const_missing       = true
+    config.opal.dynamic_require_severity = :ignore
+
+    # Enable/disable /opal_specs route
+    config.opal.enable_specs        = true
+
+    config.opal.spec_location = 'spec-opal'
   end
 end
 

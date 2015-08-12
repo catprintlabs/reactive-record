@@ -1,4 +1,5 @@
 require 'user'
+require 'todo_item'
 
 class Test
 

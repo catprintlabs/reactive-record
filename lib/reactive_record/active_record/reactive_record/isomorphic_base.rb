@@ -7,7 +7,6 @@ module ReactiveRecord
     include React::IsomorphicHelpers
         
     before_first_mount do
-      puts "mounting reactive record"
       if RUBY_ENGINE != 'opal'
         @server_data_cache = ReactiveRecord::ServerDataCache.new
       else
@@ -31,13 +30,11 @@ module ReactiveRecord
     
     isomorphic_method(:fetch_from_db) do |f, vector|
       # vector must end with either "*all", or be a simple attribute
-      puts "fetch from db vector = #{vector} RUBY_ENGINE = #{RUBY_ENGINE}"
       f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
       f.when_on_server { @server_data_cache[*vector] }
     end
     
     isomorphic_method(:find_in_db) do |f, klass, attribute, value|
-      puts "OKAY OKAY OKAY #{klass}, #{attribute}, #{value}"
       f.send_to_server klass.name, attribute, value if  RUBY_ENGINE == 'opal'
       f.when_on_server { @server_data_cache[klass, ["find_by_#{attribute}", value], :id] }
     end
@@ -45,7 +42,7 @@ module ReactiveRecord
     prerender_footer do
       json = @server_data_cache.as_json.to_json  # can this just be to_json?
       @server_data_cache.clear_requests
-      path = ::Rails.application.routes.routes.detect { |route| route.app == ReactiveRecord::Engine }.path.spec
+      path = ::Rails.application.routes.routes.detect { |route| route.app.app == ReactiveRecord::Engine }.path.spec
       "<script type='text/javascript'>\n"+
         "window.ReactiveRecordEnginePath = '#{path}';\n"+
         "if (typeof window.ReactiveRecordInitialData === 'undefined') { window.ReactiveRecordInitialData = [] }\n" +
@@ -63,8 +60,6 @@ module ReactiveRecord
       # rendering cycle completes.  
       # takes care of informing react that there are things to load, and schedules the loader to run
       # Note there is no equivilent to find_in_db, because each vector implicitly does a find.
-      #puts "load_from_db called with #{vector} data loading? #{data_loading?}"
-      puts "ARGGGGGGJJGJGJGJGJGJGJJGJGJGJGJGJGJ #{vector}" if data_loading?
       return "" if data_loading?
       ReactiveRecord.loads_pending!
       ReactiveRecord::WhileLoading.loading! # inform react that the current value is bogus
@@ -75,26 +70,21 @@ module ReactiveRecord
 
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.001) do
-        puts "scheduled fetch!!!!"
         last_fetch_at = @last_fetch_at
         HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response|
-          puts "$$--$$--$$--$$--$$ Running Fetch Now $$$$$"
           begin
             ReactiveRecord::Base.load_from_json(response.json)
           rescue Exception => e
-            puts "Exception raised while loading json #{e}"
+            message = "Exception raised while loading json from server: #{e}"
+            `console.error(#{message})`
           end
-          puts "schedule fetch"
           ReactiveRecord.run_blocks_to_load
           ReactiveRecord::WhileLoading.loaded_at last_fetch_at
-          puts "done with all that good stuff"
         end if @pending_fetches.count > 0
         @pending_fetches = []
         @last_fetch_at = Time.now
         @fetch_scheduled = nil
       end
-    rescue Exception => e
-      puts "schedule_fetch Exception #{e.message}"
     end
     
     def self.get_type_hash(record)
@@ -113,7 +103,6 @@ module ReactiveRecord
 
         elsif changed?
           
-          puts "doing some saving"
           # we want to pass not just the model data to save, but also enough information so that on return from the server
           # we can update the models on the client
 
@@ -156,9 +145,7 @@ module ReactiveRecord
             record_index += 1
           end
           
-          puts "done processing"
-
-          backing_records.each { |id, record| puts "saving a record"; record.saving! }
+          backing_records.each { |id, record| record.saving! }
           
           promise = Promise.new
 
@@ -173,8 +160,6 @@ module ReactiveRecord
           end
           promise
         end
-      rescue Exception => e
-        puts "saving broke #{e}"
       end
       
     else
@@ -206,20 +191,13 @@ module ReactiveRecord
         
         associations.each do |association|
           begin
-            puts "updating next association = #{association}"
-            puts "updating association #{reactive_records[association[:parent_id]]}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]}"
             if reactive_records[association[:parent_id]].class.reflect_on_aggregation(association[:attribute].to_sym)
-              puts "its an aggregation"
               reactive_records[association[:parent_id]].send("#{association[:attribute]}=", reactive_records[association[:child_id]])
             elsif reactive_records[association[:parent_id]].class.reflect_on_association(association[:attribute].to_sym).collection?
-              puts "its a collection"
               reactive_records[association[:parent_id]].send("#{association[:attribute]}") << reactive_records[association[:child_id]]
             else
-              puts "its not a collection"
               reactive_records[association[:parent_id]].send("#{association[:attribute]}=", reactive_records[association[:child_id]])
             end
-          rescue Exception => e
-            puts "that broke! => #{e}"
           end
         end if associations 
 
@@ -246,17 +224,13 @@ module ReactiveRecord
       
       def destroy(&block)
 
-        puts "destroying #{@ar_instance}< #{self.attributes} > destroyed: #{@destroyed}"
         return if @destroyed
 
         model.reflect_on_all_associations.each do |association|
           if association.collection?
-            puts "clearing collection #{association.attribute}"
             attributes[association.attribute].replace([]) if attributes[association.attribute]
           else
-            puts "trying to delete #{association.attribute}"
             @ar_instance.send("#{association.attribute}=", nil)
-            puts "done"
           end
         end
         
@@ -277,8 +251,6 @@ module ReactiveRecord
         @destroyed = true
         
         promise
-      rescue Exception => e
-        puts "destroyed problem #{e}"
       end
       
     else

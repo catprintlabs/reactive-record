@@ -1,0 +1,9 @@
+<%= react_component 'TodosComponent', {users: User.all}, prerender: !params[:no_prerender] %>
+
+<hr>
+
+<%= react_component 'AnotherComponent', {user: User.find_by_email("mitch@catprint.com") }, prerender: !params[:no_prerender] %>
+
+<hr>
+
+<%= react_component 'EmptyComponent', { }, prerender: !params[:no_prerender] %>

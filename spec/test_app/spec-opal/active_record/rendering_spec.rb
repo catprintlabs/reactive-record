@@ -1,4 +1,4 @@
-require 'spec/spec_helper'
+require 'spec_helper'
 require 'user'
 require 'todo_item'
 require 'address'
@@ -24,7 +24,6 @@ describe "integration with react" do
       "NOT YET"
     end
   end.should_generate do  
-    puts "r1 == r2 #{html}"
     html == "SAME OBJECT"
   end
   
@@ -37,7 +36,6 @@ describe "integration with react" do
   rendering("an attribute from the server") do
     User.find_by_email("mitch@catprint.com").first_name
   end.should_generate do
-    puts "got first_name = #{html}"
     html == "Mitch"
   end
     
@@ -46,30 +44,24 @@ describe "integration with react" do
       todo.title
     end.join(", ")
   end.should_generate do
-    puts "html = #{html}"
     html == "a todo for mitch, another todo for mitch"
   end
   
   rendering("a belongs_to association from id") do
-    puts "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@rendering from id"
-    #User.find_by_email("mitch@catprint.com").todo_items.first.user.email
     TodoItem.find(1).user.email
   end.should_generate do
-    puts "@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@html = #{html}"
     html == "mitch@catprint.com"
   end
   
   rendering("a belongs_to association from an attribute") do
     User.find_by_email("mitch@catprint.com").todo_items.first.user.email
   end.should_generate do
-    puts "html = #{html}"
     html == "mitch@catprint.com"
   end
 
   rendering("an aggregation") do
     User.find_by_email("mitch@catprint.com").address.city
   end.should_generate do
-    puts "html = #{html}"
     html == "Rochester"
   end
   
