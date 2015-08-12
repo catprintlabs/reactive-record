@@ -6,5 +6,5 @@ gem 'react-rails', path: "../../../react-rails"
 gem 'opal-react', path: "../../../opal-react" #git: "https://github.com/catprintlabs/react.rb.git", :branch => 'opal-0.8'
 gem 'opal-rails'
 gem 'rspec-rails'
-gem 'reactive_record', path: "../.."
+gem 'reactive-record', path: "../.."
 gem 'byebug'

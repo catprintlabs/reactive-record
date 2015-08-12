@@ -3,7 +3,7 @@ require 'opal-rspec'
 require 'reactive_record_config'
 require 'react_js_test_only'
 require 'opal-react'
-require 'reactive_record'
+require 'reactive-record'
 require 'jquery'
 require 'opal-jquery'
 

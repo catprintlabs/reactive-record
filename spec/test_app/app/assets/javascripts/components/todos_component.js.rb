@@ -1,6 +1,6 @@
 require 'opal-react'
 require 'user'
-require 'reactive_record'
+require 'reactive-record'
 
 class TodosComponent
   

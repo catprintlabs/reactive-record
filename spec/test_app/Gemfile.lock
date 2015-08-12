@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    reactive_record (0.7.0)
+    reactive-record (0.7.0)
       opal-browser
       opal-rails
       opal-react
@@ -188,7 +188,7 @@ DEPENDENCIES
   opal-react!
   rails
   react-rails!
-  reactive_record!
+  reactive-record!
   rspec-rails
   sqlite3
 
