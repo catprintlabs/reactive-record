@@ -5,20 +5,15 @@ require 'address'
 require 'components/test'
 
 describe "prerendering" do
-  
-
-  #element = React.create_element(Test)
-  #React.render(element, container)
-
 
   it "passes" do
     expect(true).to be_truthy
   end
-  
+
   it "will not return an id before preloading" do
     expect(User.find_by_email("mitch@catprint.com").id).not_to eq(1)
   end
-  
+
   async "preloaded the records" do
     `window.ClientSidePrerenderDataInterface.ReactiveRecordInitialData = undefined` rescue nil
     container = Element[Document.body].append('<div></div>').children.last
@@ -30,6 +25,7 @@ describe "prerendering" do
         expect(mitch.first_name).to eq("Mitch")
         expect(mitch.todo_items.first.title).to eq("a todo for mitch")
         expect(mitch.address.zip).to eq("14617")
+        expect(mitch.todo_items.find_string("mitch").first.title).to eq("a todo for mitch")
       end
     end
     `container.load('/test', complete)`
@@ -46,5 +42,5 @@ describe "prerendering" do
     end
     `container.load('/test', complete)`
   end
-  
+
 end

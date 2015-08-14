@@ -13,6 +13,7 @@ class Test
       "#{Time.now.to_s} #{user.first_name}".br
       "zip: #{user.address.zip}".br
       "todos: #{user.todo_items.collect { |todo| todo.title }.join(", ")}".br
+      "first todo in find_string(mitch) scope: #{user.todo_items.find_string("mitch").first.title}".br
     end
   end
 
