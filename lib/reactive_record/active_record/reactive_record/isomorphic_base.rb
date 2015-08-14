@@ -42,7 +42,10 @@ module ReactiveRecord
     prerender_footer do
       json = @server_data_cache.as_json.to_json  # can this just be to_json?
       @server_data_cache.clear_requests
-      path = ::Rails.application.routes.routes.detect { |route| route.app.app == ReactiveRecord::Engine }.path.spec
+      path = ::Rails.application.routes.routes.detect do |route| 
+        # not sure why the second check is needed.  It happens in the test app
+        route.app == ReactiveRecord::Engine or (route.app.respond_to?(:app) and route.app.app == ReactiveRecord::Engine)
+      end.path.spec
       "<script type='text/javascript'>\n"+
         "window.ReactiveRecordEnginePath = '#{path}';\n"+
         "if (typeof window.ReactiveRecordInitialData === 'undefined') { window.ReactiveRecordInitialData = [] }\n" +

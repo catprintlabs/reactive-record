@@ -276,7 +276,7 @@ module ReactiveRecord
       type = hash[klass.inheritance_column]
       begin
         return Object.const_get(type)
-      rescue Exeception => e
+      rescue Exception => e
         message = "Could not subclass #{@model_klass.model_name} as #{type}.  Perhaps #{type} class has not been required. Exception: #{e}"
         `console.error(#{message})`
       end if type

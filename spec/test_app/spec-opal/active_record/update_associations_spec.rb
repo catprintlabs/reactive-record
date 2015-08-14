@@ -96,6 +96,28 @@ use_case "updating associations" do
     end
   end
   
+  now_it "is time to create a todo that belongs to nobody" do
+    nobodys_business = TodoItem.new({title: "round to it"})
+    nobodys_business.save.then_test do 
+      expect(nobodys_business).to be_saved
+    end
+  end
+  
+  and_it "can be reloaded" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      TodoItem.find_by_title("round to it").id
+    end.then_test do |id|
+      expect(id).not_to be_nil
+    end
+  end
+  
+  and_it "can be deleted of course" do
+    TodoItem.find_by_title("round to it").destroy.then_test do
+      expect(TodoItem.find_by_title("round to it")).to be_destroyed
+    end
+  end
+    
   and_it "is time to delete Jan" do
     User.find_by_first_name("Jan").destroy.then_test do
       expect(User.find_by_first_name("Jan")).to be_destroyed
