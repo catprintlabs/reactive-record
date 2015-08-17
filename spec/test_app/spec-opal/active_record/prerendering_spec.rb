@@ -37,7 +37,7 @@ describe "prerendering" do
     complete = lambda do
       React::IsomorphicHelpers.load_context
       run_async do
-        expect(User.find_by_email("mitch@catprint.com").last_name).to eq("")
+        expect(User.find_by_email("mitch@catprint.com").last_name.to_s).to eq("")
       end
     end
     `container.load('/test', complete)`

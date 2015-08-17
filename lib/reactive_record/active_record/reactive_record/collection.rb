@@ -33,7 +33,6 @@ module ReactiveRecord
       @collection
     end
 
-
     def ==(other_collection)
       if @collection
         @collection == other_collection.all
@@ -65,6 +64,11 @@ module ReactiveRecord
       all << item unless all.include? item
       self
     end
+    
+    def last(*args)
+      apply_scope(:last, *args)
+    end
+    
 
     def replace(new_array)
       return new_array if @collection == new_array

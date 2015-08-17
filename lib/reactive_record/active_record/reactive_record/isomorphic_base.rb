@@ -54,6 +54,11 @@ module ReactiveRecord
     end if RUBY_ENGINE != 'opal'
     
     # Client side db access (never called during prerendering):
+    
+    # Always returns an object of class DummyValue which will act like most standard AR field types
+    # Whenever a dummy value is accessed it notify React that there are loads pending so appropriate rerenders
+    # will occur when the value is eventually loaded.
+    
     # queue up fetches, and at the end of each rendering cycle fetch the records
     # notify that loads are pending
 
@@ -63,13 +68,60 @@ module ReactiveRecord
       # rendering cycle completes.  
       # takes care of informing react that there are things to load, and schedules the loader to run
       # Note there is no equivilent to find_in_db, because each vector implicitly does a find.
-      return "" if data_loading?
-      ReactiveRecord.loads_pending!
-      ReactiveRecord::WhileLoading.loading! # inform react that the current value is bogus
-      @pending_fetches << vector
-      schedule_fetch
-      ""
+      unless data_loading?
+        @pending_fetches << vector
+        schedule_fetch
+      end
+      DummyValue.new
     end
+    
+    class DummyValue
+      
+      def notify
+        unless ReactiveRecord::Base.data_loading?
+          ReactiveRecord.loads_pending!
+          ReactiveRecord::WhileLoading.loading!
+        end
+      end
+      
+      def initialize()
+        notify
+      end
+      
+      def method_missing(method, *args, &block)
+        if "".respond_to? method
+          notify
+          "".send(method, *args, &block)
+        else
+          super
+        end
+      end
+      
+      def to_s 
+        notify
+        ""
+      end
+      
+      def to_f
+        notify
+        0.0
+      end
+      
+      def to_i
+        notify
+        0
+      end
+      
+      def to_date
+        "2001-01-01T00:00:00.000-00:00".to_date
+      end
+      
+      def acts_as_string?
+        true
+      end
+      
+    end
+    
 
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.001) do

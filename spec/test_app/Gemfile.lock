@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    reactive-record (0.7.1)
+    reactive-record (0.7.2)
       opal-browser
       opal-rails
       opal-react
@@ -12,7 +12,7 @@ PATH
 PATH
   remote: ../../../opal-react
   specs:
-    opal-react (0.7.0)
+    opal-react (0.7.3)
       opal
       opal-activesupport
 
