@@ -142,7 +142,7 @@ module ReactiveRecord
     end
   
     def reactive_set!(attribute, value)
-      unless @destroyed or attributes[attribute] == value
+      unless @destroyed or (!(attributes[attribute].is_a? DummyValue) and attributes[attribute] == value)
         if association = @model.reflect_on_association(attribute) 
           if association.collection? 
             collection = Collection.new(association.klass, @ar_instance, association)

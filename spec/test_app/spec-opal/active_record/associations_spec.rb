@@ -1,5 +1,6 @@
 require 'spec_helper'
-#require 'active_record'
+require 'user'
+require 'todo_item'
 
 
 class Thing < ActiveRecord::Base
@@ -21,6 +22,10 @@ describe "ActiveRecord" do
   #     expect(true).to be(true)
   #   end 
   # end
+  
+  it "knows a targets owner before loading" do
+    expect(User.find_by_email("mitch@catprint.com").todo_items.first.user.email).to eq("mitch@catprint.com")
+  end
   
   describe "Association Reflection" do
     

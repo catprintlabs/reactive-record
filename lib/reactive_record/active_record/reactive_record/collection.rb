@@ -19,6 +19,7 @@ module ReactiveRecord
     end
 
     def all
+      @dummy_collection.notify if @dummy_collection
       unless @collection
         @collection = []
         if ids = ReactiveRecord::Base.fetch_from_db([*@vector, "*all"])
@@ -26,8 +27,10 @@ module ReactiveRecord
             @collection << @target_klass.find_by(@target_klass.primary_key => id)
           end
         else
-          ReactiveRecord::Base.load_from_db(*@vector, "*all")
-          @collection << ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
+          @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
+          dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
+          dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner
+          @collection << dummy_record
         end
       end
       @collection

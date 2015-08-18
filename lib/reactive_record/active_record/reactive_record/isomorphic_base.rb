@@ -75,7 +75,7 @@ module ReactiveRecord
       DummyValue.new
     end
     
-    class DummyValue
+    class DummyValue < NilClass
       
       def notify
         unless ReactiveRecord::Base.data_loading?
@@ -126,13 +126,21 @@ module ReactiveRecord
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.001) do
         last_fetch_at = @last_fetch_at
-        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: @pending_fetches.uniq}).then do |response|
+        pending_fetches = @pending_fetches.uniq
+        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
           begin
             ReactiveRecord::Base.load_from_json(response.json)
           rescue Exception => e
             message = "Exception raised while loading json from server: #{e}"
             `console.error(#{message})`
           end
+          pending_fetches_native = pending_fetches.to_n
+          response_native = response.json.to_n
+          %x{
+            console.warn("Server Fetch Complete")
+            console.warn(pending_fetches_native)
+            console.warn(response_native)
+          }
           ReactiveRecord.run_blocks_to_load
           ReactiveRecord::WhileLoading.loaded_at last_fetch_at
         end if @pending_fetches.count > 0
