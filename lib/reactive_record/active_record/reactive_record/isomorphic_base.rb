@@ -14,9 +14,12 @@ module ReactiveRecord
         if on_opal_client? 
           @pending_fetches = []
           @last_fetch_at = Time.now
-          JSON.from_object(`window.ReactiveRecordInitialData`).each do |hash|
-            load_from_json hash
-          end unless `typeof window.ReactiveRecordInitialData === 'undefined'`
+          unless `typeof window.ReactiveRecordInitialData === 'undefined'`
+            log(["Reactive record prerendered data being loaded: %o", `window.ReactiveRecordInitialData`])
+            JSON.from_object(`window.ReactiveRecordInitialData`).each do |hash|
+              load_from_json hash
+            end
+          end
         end
       end
     end
@@ -63,6 +66,7 @@ module ReactiveRecord
     # notify that loads are pending
 
     def self.load_from_db(*vector)
+      return nil unless on_opal_client? # this can happen when we are on the server and a nil value is returned for an attribute
       # only called from the client side
       # pushes the value of vector onto the a list of vectors that will be loaded from the server when the next
       # rendering cycle completes.  
@@ -95,6 +99,10 @@ module ReactiveRecord
         else
           super
         end
+      end
+      
+      def ==(other_value)
+        other_value.is_a? DummyValue
       end
       
       def to_s 
@@ -131,16 +139,10 @@ module ReactiveRecord
           begin
             ReactiveRecord::Base.load_from_json(response.json)
           rescue Exception => e
-            message = "Exception raised while loading json from server: #{e}"
-            `console.error(#{message})`
+            log("Exception raised while loading json from server: #{e}", :error)
           end
-          pending_fetches_native = pending_fetches.to_n
-          response_native = response.json.to_n
-          %x{
-            console.warn("Server Fetch Complete")
-            console.warn(pending_fetches_native)
-            console.warn(response_native)
-          }
+          log(["Server Fetched:  %o", pending_fetches.to_n])
+          log(["       Returned: %o", response.json.to_n])
           ReactiveRecord.run_blocks_to_load
           ReactiveRecord::WhileLoading.loaded_at last_fetch_at
         end if @pending_fetches.count > 0
@@ -296,7 +298,7 @@ module ReactiveRecord
             @ar_instance.send("#{association.attribute}=", nil)
           end
         end
-        
+
         promise = Promise.new
 
         if id or vector

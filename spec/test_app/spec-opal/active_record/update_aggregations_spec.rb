@@ -6,6 +6,7 @@ require 'address'
 use_case "updating aggregations" do
   
   first_it "is time to make a new user" do
+    React::IsomorphicHelpers.load_context
     ReactiveRecord.load do 
       User.find_by_first_name("Jon").id
     end.then_test do |id|

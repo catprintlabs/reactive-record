@@ -6,6 +6,7 @@ require 'address'
 use_case "updating associations" do
   
   first_it "is time to make a new user" do
+    React::IsomorphicHelpers.load_context
     ReactiveRecord.load do 
       User.find_by_first_name("Jon").id
     end.then_test do |id|
@@ -39,7 +40,7 @@ use_case "updating associations" do
       expect(count).to be(1)
     end
   end
-  
+
   and_it "will have the correct titles" do
     ReactiveRecord.load do
       User.find_by_first_name("Jon").todo_items.collect { | todo | todo.title }
@@ -86,7 +87,7 @@ use_case "updating associations" do
       expect(User.find_by_first_name("Jan").todo_items).to be_empty
     end
   end
-  
+
   and_it "won't exist" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
@@ -117,7 +118,7 @@ use_case "updating associations" do
       expect(TodoItem.find_by_title("round to it")).to be_destroyed
     end
   end
-    
+
   and_it "is time to delete Jan" do
     User.find_by_first_name("Jan").destroy.then_test do
       expect(User.find_by_first_name("Jan")).to be_destroyed

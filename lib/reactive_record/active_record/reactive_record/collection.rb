@@ -10,8 +10,8 @@ module ReactiveRecord
       @owner = owner  # can be nil if this is an outer most scope
       @association = association
       @target_klass = target_klass
-      if owner and !owner.id and !owner.vector
-        @synced_collection = @collection = []
+      if owner and !owner.id and vector.length <= 1
+        @collection = []
       else
         @vector = vector.count == 0 ? [target_klass] : vector
       end
@@ -28,20 +28,18 @@ module ReactiveRecord
           end
         else
           @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
-          dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
-          dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner
-          @collection << dummy_record
+          @dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
+          @dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner
+          @collection << @dummy_record
         end
       end
       @collection
     end
 
     def ==(other_collection)
-      if @collection
-        @collection == other_collection.all
-      else
-        !other_collection.instance_variable_get(:@collection)
-      end
+      my_collection = (@collection || []).select { |target| target != @dummy_record }
+      other_collection = (other_collection ? (other_collection.collection || []) : []).select { |target| target != other_collection.dummy_record }
+      my_collection == other_collection
     end
 
     def apply_scope(scope, *args)
@@ -50,7 +48,7 @@ module ReactiveRecord
       scope = [scope, *args] if args.count > 0
       @scopes[scope] ||= Collection.new(@target_klass, @owner, @association, *@vector, [scope])
     end
-
+    
     def proxy_association
       @association
     end
@@ -68,19 +66,29 @@ module ReactiveRecord
       self
     end
     
-    def last(*args)
-      apply_scope(:last, *args)
+    [:first, :last].each do |method|
+      define_method method do |*args|
+        if args.count == 0
+          all.send(method)
+        else
+          apply_scope(method, *args)
+        end
+      end
     end
     
-
     def replace(new_array)
-      return new_array if @collection == new_array
-      if @collection
-        @collection.dup.each { |item| delete(item) }
+      #return new_array if @collection == new_array  #not sure we need this anymore
+      @dummy_collection.notify if @dummy_collection
+      @collection.dup.each { |item| delete(item) } if @collection
+      @collection = []
+      if new_array.is_a? Collection
+        @dummy_collection = new_array.dummy_collection
+        @dummy_record = new_array.dummy_record
+        new_array.collection.each { |item| self << item } if new_array.collection
       else
-        @collection = []
+        @dummy_collection = @dummy_record = nil
+        new_array.each { |item| self << item }
       end
-      new_array.each { |item| self << item }
       new_array
     end
 
@@ -101,6 +109,20 @@ module ReactiveRecord
       else
         super
       end
+    end
+    
+    protected
+    
+    def dummy_record
+      @dummy_record
+    end
+    
+    def collection
+      @collection
+    end
+    
+    def dummy_collection
+      @dummy_collection
     end
 
   end

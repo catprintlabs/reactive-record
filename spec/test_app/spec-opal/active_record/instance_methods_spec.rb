@@ -4,6 +4,7 @@ class Thing < ActiveRecord::Base
 end
 
 describe "ActiveRecord" do
+  before(:each) { React::IsomorphicHelpers.load_context }
   let(:instance) { Thing.new({attr1: 1, attr2: 2, id: 123}) }
   after(:each) { React::API.clear_component_class_cache }
   

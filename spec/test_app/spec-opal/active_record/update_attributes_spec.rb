@@ -6,6 +6,7 @@ require 'address'
 use_case "creating and updating a record" do
   
   first_it "make sure user does not exist" do
+    React::IsomorphicHelpers.load_context
     ReactiveRecord.load do 
       User.find_by_first_name("Jon").id
     end.then_test do |id|

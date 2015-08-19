@@ -4,6 +4,8 @@ require 'user'
 
 describe "dummy values" do
   
+  before(:each) { React::IsomorphicHelpers.load_context }
+  
   it "fetches a dummy value" do
     expect(User.find_by_email("mitch@catprint.com").first_name.to_s.is_a?(String)).to be_truthy
   end

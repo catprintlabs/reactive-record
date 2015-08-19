@@ -49,15 +49,16 @@ module ReactiveRecord
       @data_loading = false
     end
   
-    def self.find(model, attribute, value)  
-    
+    def self.find(model, attribute, value) 
       # will return the unique record with this attribute-value pair
       # value cannot be an association or aggregation
         
       model = model.base_class
       # already have a record with this attribute-value pair?
       record = @records[model].detect { |record| record.attributes[attribute] == value}
-      
+      if !record and attribute == 'id' and !@disabled_debugging
+       # `debugger`
+      end
       unless record
         # if not, and then the record may be loaded, but not have this attribute set yet,
         # so find the id of of record with the attribute-value pair, and see if that is loaded.
@@ -95,14 +96,14 @@ module ReactiveRecord
     
     def initialize(model, hash = {}, ar_instance = nil)
       @model = model
-      @attributes = hash
       @synced_attributes = {}
+      @attributes = hash
       @ar_instance = ar_instance
       records[model] << self
     end
   
     def find(*args)
-      self.find(*args)
+      self.class.find(*args)
     end
   
     def new_from_vector(*args)
@@ -142,7 +143,7 @@ module ReactiveRecord
     end
   
     def reactive_set!(attribute, value)
-      unless @destroyed or (!(attributes[attribute].is_a? DummyValue) and attributes[attribute] == value)
+      unless @destroyed or (!(attributes[attribute].is_a? DummyValue) and attributes.has_key?(attribute) and attributes[attribute] == value)
         if association = @model.reflect_on_association(attribute) 
           if association.collection? 
             collection = Collection.new(association.klass, @ar_instance, association)
@@ -153,7 +154,7 @@ module ReactiveRecord
             inverse_association = association.klass.reflect_on_association(inverse_of)
             if inverse_association.collection?
               if !value
-                attributes[attribute].attributes[inverse_of].delete(@ar_instance)
+                attributes[attribute].attributes[inverse_of].delete(@ar_instance) if attributes[attribute]
               elsif value.attributes[inverse_of]
                 value.attributes[inverse_of] << @ar_instance
               else
@@ -176,14 +177,26 @@ module ReactiveRecord
     end
   
     def changed?(*args)
-      if args.count == 0
+      attrs = if args.count == 0
         React::State.get_state(self, self)
-        @attributes != @synced_attributes
+        @attributes.dup
       else
-        key = args[0]
-        React::State.get_state(@attributes, key)
-        @attributes.has_key?(key) != @synced_attributes.has_key?(key) or @attributes[key] != @synced_attributes[key]
+        React::State.get_state(@attributes, args[0])
+        {args[0] => @attributes[args[0]]}
       end
+      attrs.each do |attribute, value|
+        if association = @model.reflect_on_association(attribute) and association.collection? and value
+          puts "checking association is it true? #{value == @synced_attributes[attribute]}"
+          return true unless value == @synced_attributes[attribute]
+        elsif !@synced_attributes.has_key?(attribute)
+          puts "synced attributes does not have key (#{attribute})"
+          return true
+        elsif @synced_attributes[attribute] != value
+          puts "synced attribute #{attribute} value not the same #{value} vs #{@synced_attributes[attribute]}"
+          return true
+        end
+      end
+      false
     end
   
     def sync!(hash = {})
@@ -219,18 +232,14 @@ module ReactiveRecord
     end
   
     def find_association(association, id)
-      
       inverse_of = association.inverse_of
-      
       instance = if id
         find(association.klass, association.klass.primary_key, id)
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
-      
       instance_backing_record_attributes = instance.instance_variable_get(:@backing_record).attributes
       inverse_association = association.klass.reflect_on_association(inverse_of)
-
       if inverse_association.collection?
         instance_backing_record_attributes[inverse_of] = if id and id != ""
           Collection.new(@model, instance, inverse_association, association.klass, ["find", id], inverse_of) 
@@ -240,7 +249,7 @@ module ReactiveRecord
         instance_backing_record_attributes[inverse_of].replace [@ar_instance]
       else
         instance_backing_record_attributes[inverse_of] = @ar_instance 
-      end if inverse_of
+      end if inverse_of and !instance_backing_record_attributes.has_key?(inverse_of)
       instance
     end
         
@@ -258,7 +267,7 @@ module ReactiveRecord
           elsif aggregation = @model.reflect_on_aggregation(method)
             new_from_vector(aggregation.klass, self, *vector, method)
           elsif id and id != "" 
-            self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
+            value = self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
           else  # its a attribute in an aggregate or we are on the client and don't know the id
             self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)
           end

@@ -5,6 +5,7 @@ require 'todo_item'
 use_case "reverting records" do
   
   first_it "finds that the user Adam has not changed yet" do
+    React::IsomorphicHelpers.load_context
     ReactiveRecord.load do 
       User.find_by_first_name("Adam")
     end.then_test do |user|
