@@ -18,4 +18,12 @@ describe "dummy values" do
     expect(User.find_by_email("mitch@catprint.com").id.to_i.is_a?(Integer)).to be_truthy
   end
   
+  it "can do math on a value" do
+    expect(1 + User.find_by_email("mitch@catprint.com").id).to eq(1)
+  end
+  
+  xit "can do string things as well" do # can't because of the way strings work in opal
+    expect("id: "+ User.find_by_email("mitch@catprint.com").id).to eq("id: ")
+  end
+  
 end

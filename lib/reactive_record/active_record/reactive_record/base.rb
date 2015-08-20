@@ -186,13 +186,10 @@ module ReactiveRecord
       end
       attrs.each do |attribute, value|
         if association = @model.reflect_on_association(attribute) and association.collection? and value
-          puts "checking association is it true? #{value == @synced_attributes[attribute]}"
           return true unless value == @synced_attributes[attribute]
         elsif !@synced_attributes.has_key?(attribute)
-          puts "synced attributes does not have key (#{attribute})"
           return true
         elsif @synced_attributes[attribute] != value
-          puts "synced attribute #{attribute} value not the same #{value} vs #{@synced_attributes[attribute]}"
           return true
         end
       end

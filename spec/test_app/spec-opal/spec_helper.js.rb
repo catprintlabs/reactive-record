@@ -58,6 +58,8 @@ module Opal
         
         def self.resolve_current_promise
           @current_promise.resolve if @current_promise
+        rescue Exception => e
+          raise "test structure error:  Usually this is caused by a use_case test that has only a first_it an no other tests.  Check the use_case that ran just before this one."
         end
         
         def self.get_current_promise_test_instance

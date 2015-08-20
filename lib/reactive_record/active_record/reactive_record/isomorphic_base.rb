@@ -43,8 +43,12 @@ module ReactiveRecord
     end
     
     prerender_footer do
-      json = @server_data_cache.as_json.to_json  # can this just be to_json?
-      @server_data_cache.clear_requests
+      if @server_data_cache
+        json = @server_data_cache.as_json.to_json  # can this just be to_json?
+        @server_data_cache.clear_requests
+      else
+        json = {}.to_json
+      end
       path = ::Rails.application.routes.routes.detect do |route| 
         # not sure why the second check is needed.  It happens in the test app
         route.app == ReactiveRecord::Engine or (route.app.respond_to?(:app) and route.app.app == ReactiveRecord::Engine)
@@ -93,12 +97,19 @@ module ReactiveRecord
       end
       
       def method_missing(method, *args, &block)
-        if "".respond_to? method
+        if 0.respond_to? method
+          notify
+          0.send(method, *args, &block)
+        elsif "".respond_to? method
           notify
           "".send(method, *args, &block)
         else
           super
         end
+      end
+      
+      def coerce(s)
+        [self.send("to_#{s.class.name.downcase}"), s]
       end
       
       def ==(other_value)
@@ -120,6 +131,11 @@ module ReactiveRecord
         0
       end
       
+      def to_numeric
+        notify
+        0
+      end
+      
       def to_date
         "2001-01-01T00:00:00.000-00:00".to_date
       end
@@ -135,13 +151,13 @@ module ReactiveRecord
       @fetch_scheduled ||= after(0.001) do
         last_fetch_at = @last_fetch_at
         pending_fetches = @pending_fetches.uniq
+        log(["Server Fetching: %o", pending_fetches.to_n])
         HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
           begin
             ReactiveRecord::Base.load_from_json(response.json)
           rescue Exception => e
             log("Exception raised while loading json from server: #{e}", :error)
           end
-          log(["Server Fetched:  %o", pending_fetches.to_n])
           log(["       Returned: %o", response.json.to_n])
           ReactiveRecord.run_blocks_to_load
           ReactiveRecord::WhileLoading.loaded_at last_fetch_at

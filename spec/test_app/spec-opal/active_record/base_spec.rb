@@ -32,6 +32,8 @@ class Scoped < ActiveRecord::Base
 end
 
 describe "ActiveRecord" do
+  
+  before(:all) { React::IsomorphicHelpers.load_context }
 
   after(:each) { React::API.clear_component_class_cache }
   

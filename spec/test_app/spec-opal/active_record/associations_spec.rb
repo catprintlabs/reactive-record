@@ -23,10 +23,6 @@ describe "ActiveRecord" do
   #   end 
   # end
   
-  it "knows a targets owner before loading" do
-    React::IsomorphicHelpers.load_context
-    expect(User.find_by_email("mitch@catprint.com").todo_items.first.user.email).to eq("mitch@catprint.com")
-  end
   
   describe "Association Reflection" do
     

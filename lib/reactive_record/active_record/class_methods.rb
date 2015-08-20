@@ -66,7 +66,7 @@ module ActiveRecord
     end
     
     def all
-      ReactiveRecord::Collection.new(self)
+      ReactiveRecord::Collection.new(self, nil, nil, self, "all")
     end
         
     [:belongs_to, :has_many, :has_one].each do |macro| 

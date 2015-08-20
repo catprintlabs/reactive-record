@@ -175,15 +175,18 @@ module ReactiveRecord
           end
           
           def build_new_instances(method)
-            if method == "*all" 
-              apply_method_to_cache(method) { |cache_item| cache_item.value.collect { |record| record.id }}
-            elsif method == "*" and @ar_object and @ar_object.length > 0
-              @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
-                apply_method_to_cache(method) { record }
+            if method == "*all"
+              apply_method_to_cache("*all") { |cache_item| cache_item.value.collect { |record| record.id } }
+            elsif method == "*" 
+              if @ar_object and @ar_object.length > 0
+                @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
+                  apply_method_to_cache(method) { record }
+                end
+              else
+                apply_method_to_cache(method) {[]}
               end
             elsif @ar_object.respond_to? [*method].first  
-              apply_method_to_cache(method) { |cache_item| 
-                cache_item.value.send(*method)}
+              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method)  rescue nil } # rescue in case we are on a nil association
             else
               self
             end
@@ -213,6 +216,7 @@ module ReactiveRecord
       end
               
       def self.load_from_json(tree, target = nil)
+        tree.delete("*all") if tree["*"]
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil
@@ -221,7 +225,7 @@ module ReactiveRecord
           elsif method == "*all"
             target.replace value.collect { |id| target.proxy_association.klass.find(id) }
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
-            new_target = target.proxy_association.klass.find(method)
+            new_target = target.proxy_association.klass.find(method) 
             target << new_target
           elsif method.is_a? Array
             new_target = target.send *method
@@ -232,12 +236,7 @@ module ReactiveRecord
             target.send "#{method}=", new_target
           else
             new_target = target.send *method
-            begin 
-              new_target = target.send "#{method}=", new_target
-            rescue Exception => e
-              message = "FAILED #{target}.#{method} not set to #{new_target}"
-              `console.error(message)`
-            end
+            (new_target = target.send "#{method}=", new_target) rescue nil # this can happen for example if you say TodoItems.all
           end
           load_from_json(value, new_target) if new_target
         end

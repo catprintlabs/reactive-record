@@ -1,7 +1,7 @@
 module ReactiveRecord
 
   class Collection
-
+    
     def initialize(target_klass, owner = nil, association = nil, *vector)
       if association and (association.macro != :has_many or association.klass != target_klass)
         message = "unimplemented association #{owner} :#{association.macro} #{association.attribute}"
@@ -29,7 +29,7 @@ module ReactiveRecord
         else
           @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
           @dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
-          @dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner
+          @dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
           @collection << @dummy_record
         end
       end
@@ -50,19 +50,24 @@ module ReactiveRecord
     end
     
     def proxy_association
-      @association
+      @association || self # returning self allows this to work with things like Model.all
+    end
+    
+    def klass
+      @target_klass
     end
 
 
     def <<(item)
-      inverse_of = @association.inverse_of
-      if @owner and inverse_of = @association.inverse_of
+      if @owner and @association and inverse_of = @association.inverse_of
         item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
         item.attributes[inverse_of] = @owner
         backing_record = item.instance_variable_get(:@backing_record)
         React::State.set_state(backing_record, inverse_of, @owner) unless backing_record.data_loading?
       end
       all << item unless all.include? item
+      @collection.delete(@dummy_record)
+      @dummy_record = @dummy_collection = nil
       self
     end
     
@@ -93,7 +98,7 @@ module ReactiveRecord
     end
 
     def delete(item)
-      if @owner and inverse_of = @association.inverse_of
+      if @owner and @association and inverse_of = @association.inverse_of
         item.attributes[inverse_of] = nil
         backing_record = item.instance_variable_get(:@backing_record)
         React::State.set_state(backing_record, inverse_of, nil) unless backing_record.data_loading?
