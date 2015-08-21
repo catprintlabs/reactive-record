@@ -1,4 +1,4 @@
-require 'opal-react'
+require 'reactive-ruby'
 require 'user'
 require 'reactive-record'
 

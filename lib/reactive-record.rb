@@ -1,6 +1,6 @@
 if RUBY_ENGINE == 'opal'
   
-  require "opal-react"
+  require "reactive-ruby"
   require "reactive_record/server_data_cache"
   require "reactive_record/active_record/reactive_record/while_loading"
   require "reactive_record/active_record/reactive_record/isomorphic_base"

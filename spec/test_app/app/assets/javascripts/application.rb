@@ -1,6 +1,6 @@
 require 'opal'
 require 'opal_ujs'
-require 'opal-react'
+require 'reactive-ruby'
 #require 'turbolinks'
 #require_tree '.'
 puts "G'day world!" # check the console!

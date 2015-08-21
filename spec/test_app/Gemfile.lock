@@ -1,20 +1,13 @@
 PATH
   remote: ../..
   specs:
-    reactive-record (0.7.3)
+    reactive-record (0.7.4)
       opal-browser
       opal-rails
-      opal-react
       rails (>= 3.2.13)
       react-rails
+      reactive-ruby
       therubyracer
-
-PATH
-  remote: ../../../opal-react
-  specs:
-    opal-react (0.7.3)
-      opal
-      opal-activesupport
 
 PATH
   remote: ../../../react-rails
@@ -25,6 +18,13 @@ PATH
       execjs
       rails (>= 3.2)
       tilt
+
+PATH
+  remote: ../../../reactive-ruby
+  specs:
+    reactive-ruby (0.7.3)
+      opal
+      opal-activesupport
 
 GEM
   remote: http://rubygems.org/
@@ -185,10 +185,10 @@ DEPENDENCIES
   byebug
   opal (~> 0.8)
   opal-rails
-  opal-react!
   rails
   react-rails!
   reactive-record!
+  reactive-ruby!
   rspec-rails
   sqlite3
 
