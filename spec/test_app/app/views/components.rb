@@ -1,5 +1,4 @@
 require 'opal'
-#require 'reactive-ruby'
 require 'reactive-record'
 require_tree './components'
 require 'shared'

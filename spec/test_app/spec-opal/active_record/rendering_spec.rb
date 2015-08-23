@@ -14,6 +14,7 @@ describe "integration with react" do
   end
 
   rendering("find by two methods gives same object once loaded") do
+    puts "now what!"
     r1 = User.find_by_email("mitch@catprint.com")
     r2 = User.find_by_first_name("Mitch")
     r1.id
@@ -26,7 +27,7 @@ describe "integration with react" do
   end.should_generate do  
     html == "SAME OBJECT"
   end
-  
+
   rendering("a simple find_by query") do
     User.find_by_email("mitch@catprint.com").email
   end.should_immediately_generate do 
@@ -64,5 +65,5 @@ describe "integration with react" do
   end.should_generate do
     html == "Rochester"
   end
-  
+
 end

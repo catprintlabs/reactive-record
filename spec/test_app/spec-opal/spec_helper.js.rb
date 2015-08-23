@@ -111,6 +111,10 @@ module Opal
               @block
             end
             
+            def self.name
+              "dummy class"
+            end
+            
             backtrace :on
             
             def render
@@ -120,6 +124,7 @@ module Opal
             def self.should_generate(opts={}, &block)
               sself = self
               @self.async(@title, opts) do
+                puts "inside async should generate"
                 expect_component_to_eventually(sself, &block)
               end
             end
@@ -172,7 +177,11 @@ module ReactTestHelpers
   def build_element(type, options)
     component = React.create_element(type, options)
     element = `ReactTestUtils.renderIntoDocument(#{component.to_n})`
-    `$(React.findDOMNode(element))`
+    if `typeof React.findDOMNode === 'undefined'`
+      `$(element.getDOMNode())`          # v0.12
+    else
+      `$(React.findDOMNode(element))`    # v0.13
+    end
   end
   
   def expect_component_to_eventually(component_class, opts = {}, &block) 
@@ -190,8 +199,11 @@ module ReactTestHelpers
          element = nil; expect(true).to be(true) 
       end if element and context.instance_exec(element, &block) 
     end
+    puts "setting up after_update"
     component_class.after_update { check_block.call  }
+    puts "getting an element"
     element = build_element component_class, opts
+    puts "calling check_block"
     check_block.call
   end
   

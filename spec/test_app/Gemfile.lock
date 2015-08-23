@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    reactive-record (0.7.4)
+    reactive-record (0.7.5)
       opal-browser
       opal-rails
       rails (>= 3.2.13)
@@ -22,9 +22,11 @@ PATH
 PATH
   remote: ../../../reactive-ruby
   specs:
-    reactive-ruby (0.7.3)
+    reactive-ruby (0.7.5)
+      jquery-rails
       opal
       opal-activesupport
+      opal-browser
 
 GEM
   remote: http://rubygems.org/
@@ -84,7 +86,7 @@ GEM
       thor (>= 0.14, < 2.0)
     json (1.8.3)
     libv8 (3.16.14.11)
-    loofah (2.0.2)
+    loofah (2.0.3)
       nokogiri (>= 1.5.9)
     mail (2.6.3)
       mime-types (>= 1.16, < 3)
@@ -131,7 +133,7 @@ GEM
       sprockets-rails
     rails-deprecated_sanitizer (1.0.3)
       activesupport (>= 4.2.0.alpha)
-    rails-dom-testing (1.0.6)
+    rails-dom-testing (1.0.7)
       activesupport (>= 4.2.0.beta, < 5.0)
       nokogiri (~> 1.6.0)
       rails-deprecated_sanitizer (>= 1.0.1)
@@ -162,7 +164,7 @@ GEM
       rspec-support (~> 3.3.0)
     rspec-support (3.3.0)
     sourcemap (0.1.1)
-    sprockets (3.2.0)
+    sprockets (3.3.3)
       rack (~> 1.0)
     sprockets-rails (2.3.2)
       actionpack (>= 3.0)
