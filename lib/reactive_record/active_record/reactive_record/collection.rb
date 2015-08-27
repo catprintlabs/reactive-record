@@ -1,10 +1,10 @@
 module ReactiveRecord
 
   class Collection
-    
+
     def initialize(target_klass, owner = nil, association = nil, *vector)
-      if association and (association.macro != :has_many or association.klass != target_klass)
-        message = "unimplemented association #{owner} :#{association.macro} #{association.attribute}"
+      if association and (association.macro != :has_many or association.klass.base_class != target_klass.base_class)
+        message = "unimplemented association #{owner} :#{association.macro} #{association.attribute}, target: #{target_klass}, association: #{association.klass}"
         `console.error(#{message})`
       end
       @owner = owner  # can be nil if this is an outer most scope
@@ -48,11 +48,11 @@ module ReactiveRecord
       scope = [scope, *args] if args.count > 0
       @scopes[scope] ||= Collection.new(@target_klass, @owner, @association, *@vector, [scope])
     end
-    
+
     def proxy_association
       @association || self # returning self allows this to work with things like Model.all
     end
-    
+
     def klass
       @target_klass
     end
@@ -70,7 +70,7 @@ module ReactiveRecord
       @dummy_record = @dummy_collection = nil
       self
     end
-    
+
     [:first, :last].each do |method|
       define_method method do |*args|
         if args.count == 0
@@ -80,7 +80,7 @@ module ReactiveRecord
         end
       end
     end
-    
+
     def replace(new_array)
       #return new_array if @collection == new_array  #not sure we need this anymore
       @dummy_collection.notify if @dummy_collection
@@ -115,17 +115,17 @@ module ReactiveRecord
         super
       end
     end
-    
+
     protected
-    
+
     def dummy_record
       @dummy_record
     end
-    
+
     def collection
       @collection
     end
-    
+
     def dummy_collection
       @dummy_collection
     end
