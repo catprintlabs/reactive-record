@@ -9,34 +9,43 @@
 # from scratch. The latter is a flawed and unsustainable approach (the more migrations
 # you'll amass, the slower it'll run and the greater likelihood for issues).
 #
-# It's strongly recommended to check this file into your version control system.
+# It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(:version => 20150729195556) do
+ActiveRecord::Schema.define(version: 20150828172008) do
 
-  create_table "addresses", :force => true do |t|
+  create_table "addresses", force: :cascade do |t|
     t.string   "street"
     t.string   "city"
     t.string   "state"
     t.string   "zip"
-    t.datetime "created_at", :null => false
-    t.datetime "updated_at", :null => false
+    t.datetime "created_at", null: false
+    t.datetime "updated_at", null: false
   end
 
-  create_table "todo_items", :force => true do |t|
+  create_table "comments", force: :cascade do |t|
+    t.integer  "user_id"
+    t.integer  "todo_item_id"
+    t.string   "comment"
+    t.datetime "created_at"
+    t.datetime "updated_at"
+  end
+
+  create_table "todo_items", force: :cascade do |t|
     t.string   "title"
     t.text     "description"
     t.boolean  "complete"
-    t.datetime "created_at",  :null => false
-    t.datetime "updated_at",  :null => false
+    t.datetime "created_at",  null: false
+    t.datetime "updated_at",  null: false
     t.integer  "user_id"
+    t.integer  "comment_id"
   end
 
-  create_table "users", :force => true do |t|
+  create_table "users", force: :cascade do |t|
     t.string   "first_name"
     t.string   "last_name"
     t.string   "email"
-    t.datetime "created_at",     :null => false
-    t.datetime "updated_at",     :null => false
+    t.datetime "created_at",     null: false
+    t.datetime "updated_at",     null: false
     t.string   "address_street"
     t.string   "address_city"
     t.string   "address_state"

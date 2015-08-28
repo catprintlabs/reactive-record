@@ -62,11 +62,20 @@ module ActiveRecord
     end
     
     def scope(name, body)
-      singleton_class.send(:define_method, name) { ReactiveRecord::Collection.new(self, nil, nil, self, name) }
+      singleton_class.send(:define_method, name) do
+        ReactiveRecord::Base.class_scopes(self)[name] ||= ReactiveRecord::Collection.new(self, nil, nil, self, name) 
+      end
+      singleton_class.send(:define_method, "#{name}=") do |collection| 
+        ReactiveRecord::Base.class_scopes(self)[name] = collection
+      end
     end
     
     def all
-      ReactiveRecord::Collection.new(self, nil, nil, self, "all")
+      ReactiveRecord::Base.class_scopes(self)[:all] ||= ReactiveRecord::Collection.new(self, nil, nil, self, "all")
+    end
+    
+    def all=(collection)
+      ReactiveRecord::Base.class_scopes(self)[:all] = collection
     end
         
     [:belongs_to, :has_many, :has_one].each do |macro| 

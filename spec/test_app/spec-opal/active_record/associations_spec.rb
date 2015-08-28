@@ -11,6 +11,10 @@ class Bucket < ActiveRecord::Base
   has_many :things
 end
 
+class OtherThing < ActiveRecord::Base
+  has_many :things, through: :thing_group
+end
+
 describe "ActiveRecord" do
   
   after(:each) { React::API.clear_component_class_cache }
@@ -57,7 +61,18 @@ describe "ActiveRecord" do
     it "knows if the association is not a collection" do
       expect(Thing.reflect_on_association(:bucket).collection?).to be_falsy
     end
-  
+    
+    it "knows the associated klass of a has_many_through relationship" do
+      expect(OtherThing.reflect_on_association(:things).klass).to eq(Thing)
+    end
+    
+    it "knows a has_many_through is a collection" do
+      expect(OtherThing.reflect_on_association(:things).collection?).to be_truthy
+    end
+    
+    it "does not return a inverse for a has_many_through collection" do
+      expect(OtherThing.reflect_on_association(:things).inverse_of).to be_nil
+    end
     
   end
   

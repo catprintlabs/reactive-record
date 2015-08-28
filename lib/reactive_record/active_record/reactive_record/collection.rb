@@ -3,10 +3,6 @@ module ReactiveRecord
   class Collection
     
     def initialize(target_klass, owner = nil, association = nil, *vector)
-      if association and (association.macro != :has_many or association.klass != target_klass)
-        message = "unimplemented association #{owner} :#{association.macro} #{association.attribute}"
-        `console.error(#{message})`
-      end
       @owner = owner  # can be nil if this is an outer most scope
       @association = association
       @target_klass = target_klass

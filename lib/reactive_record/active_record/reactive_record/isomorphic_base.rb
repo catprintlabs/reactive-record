@@ -11,6 +11,7 @@ module ReactiveRecord
         @server_data_cache = ReactiveRecord::ServerDataCache.new
       else
         @records = Hash.new { |hash, key| hash[key] = [] }
+        @class_scopes = Hash.new { |hash, key| hash[key] = {} }
         if on_opal_client? 
           @pending_fetches = []
           @last_fetch_at = Time.now
@@ -152,12 +153,16 @@ module ReactiveRecord
         last_fetch_at = @last_fetch_at
         pending_fetches = @pending_fetches.uniq
         log(["Server Fetching: %o", pending_fetches.to_n])
+        start_time = Time.now
         HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
+          fetch_time = Time.now
+          log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
           begin
             ReactiveRecord::Base.load_from_json(response.json)
           rescue Exception => e
             log("Exception raised while loading json from server: #{e}", :error)
           end
+          log("       Processed in: #{(Time.now-fetch_time).to_i}s")
           log(["       Returned: %o", response.json.to_n])
           ReactiveRecord.run_blocks_to_load
           ReactiveRecord::WhileLoading.loaded_at last_fetch_at

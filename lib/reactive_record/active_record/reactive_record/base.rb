@@ -48,6 +48,10 @@ module ReactiveRecord
       ServerDataCache.load_from_json(json, target)
       @data_loading = false
     end
+    
+    def self.class_scopes(model)
+      @class_scopes[model.base_class]
+    end
   
     def self.find(model, attribute, value) 
       # will return the unique record with this attribute-value pair
@@ -165,7 +169,7 @@ module ReactiveRecord
               attributes[attribute].attributes[inverse_of] = nil if attributes[attribute]
               value.attributes[inverse_of] = @ar_instance 
               React::State.set_state(value.instance_variable_get(:@backing_record), inverse_of, @ar_instance) unless data_loading?
-            else
+            elsif attributes[attribute]
               attributes[attribute].attributes[inverse_of] = nil
             end
           end

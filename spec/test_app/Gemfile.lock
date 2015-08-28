@@ -22,8 +22,7 @@ PATH
 PATH
   remote: ../../../reactive-ruby
   specs:
-    reactive-ruby (0.7.5)
-      jquery-rails
+    reactive-ruby (0.7.11)
       opal
       opal-activesupport
       opal-browser

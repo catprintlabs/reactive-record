@@ -11,6 +11,7 @@ describe "prerendering" do
   end
 
   it "will not return an id before preloading" do
+    React::IsomorphicHelpers.load_context
     expect(User.find_by_email("mitch@catprint.com").id).not_to eq(1)
   end
 
@@ -26,6 +27,7 @@ describe "prerendering" do
         expect(mitch.todo_items.first.title).to eq("a todo for mitch")
         expect(mitch.address.zip).to eq("14617")
         expect(mitch.todo_items.find_string("mitch").first.title).to eq("a todo for mitch")
+        expect(mitch.todo_items.first.commenters.first.email).to eq("adamg@catprint.com")
       end
     end
     `container.load('/test', complete)`

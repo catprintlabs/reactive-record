@@ -95,9 +95,10 @@ module ReactiveRecord
       if RUBY_ENGINE != 'opal'
       
         def [](*vector)
-          vector.inject(CacheItem.new(@cache, vector[0])) { |cache_item, method| cache_item.apply_method method }
+          root = CacheItem.new(@cache, vector[0])
+          vector[1..-1].inject(root) { |cache_item, method| cache_item.apply_method method if cache_item }
           vector[0] = vector[0].constantize
-          new_items = @cache.select { | cache_item | cache_item.vector == vector}
+          new_items = @cache.select { | cache_item | cache_item.root == root}
           @requested_cache_items += new_items
           new_items.last.value if new_items.last
         end
@@ -128,6 +129,7 @@ module ReactiveRecord
 
           attr_reader :vector
           attr_reader :record_chain
+          attr_reader :root
 
           def value 
             @ar_object
@@ -138,7 +140,10 @@ module ReactiveRecord
           end
           
           def self.new(db_cache, klass)
-            return existing if existing = db_cache.detect { |cached_item| cached_item.vector == [klass] }
+            klass_constant = klass.constantize
+            if existing = db_cache.detect { |cached_item| cached_item.vector == [klass_constant] }
+              return existing
+            end
             super
           end
 
@@ -149,18 +154,25 @@ module ReactiveRecord
             @ar_object = klass
             @record_chain = []
             @parent = nil
+            @root = self
             db_cache << self
           end
           
           def apply_method_to_cache(method, &block)
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
-                cache_item.clone.instance_eval do
-                  @vector = @vector + [method]  # don't push it on since you need a new vector!
-                  @ar_object = yield cache_item
-                  @db_cache << self
-                  @parent = cache_item
-                  self
+                begin
+                  new_ar_object = yield cache_item
+                  cache_item.clone.instance_eval do
+                    @vector = @vector + [method]  # don't push it on since you need a new vector!
+                    @ar_object = new_ar_object
+                    @db_cache << self
+                    @parent = cache_item
+                    @root = cache_item.root
+                    self
+                  end
+                rescue
+                  representative
                 end
               else
                 representative
@@ -185,10 +197,13 @@ module ReactiveRecord
               else
                 apply_method_to_cache(method) {[]}
               end
-            elsif @ar_object.respond_to? [*method].first  
-              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method)  rescue nil } # rescue in case we are on a nil association
-            else
-              self
+            else # @ar_object.respond_to? [*method].first 
+              puts "apply #{method} to #{@vector}" 
+              r = apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method) }# rescue nil } # rescue in case we are on a nil association
+              puts "representative method = #{r}"
+              r
+            #else
+             # self
             end
           end
           
@@ -196,7 +211,7 @@ module ReactiveRecord
             if @parent
               if method == "*"
                 @parent.as_hash({@ar_object.id => children})
-              elsif @ar_object.class < ActiveRecord::Base 
+              elsif @ar_object.class < ActiveRecord::Base and children.is_a? Hash
                 @parent.as_hash({method => children.merge({
                   :id => [@ar_object.id], 
                   @ar_object.class.inheritance_column => [@ar_object[@ar_object.class.inheritance_column]],
@@ -216,31 +231,31 @@ module ReactiveRecord
       end
               
       def self.load_from_json(tree, target = nil)
-        tree.delete("*all") if tree["*"]
+        ignore_all = nil
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil
           if !target
             load_from_json(value, Object.const_get(method))
           elsif method == "*all"
-            target.replace value.collect { |id| target.proxy_association.klass.find(id) }
+            target.replace value.collect { |id| target.proxy_association.klass.find(id) } unless ignore_all
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
-            new_target = target.proxy_association.klass.find(method) 
-            target << new_target
+            ignore_all = true
+            target << (new_target = target.proxy_association.klass.find(method))
           elsif method.is_a? Array
-            new_target = target.send *method
+            new_target = target.send *method unless value.is_a? Array # value is an array if scope returns nil
           elsif value.is_a? Array
             target.send "#{method}=", value.first
           elsif value.is_a? Hash and value[:id] and value[:id].first
             new_target = target.class.reflect_on_association(method).klass.find(value[:id].first)
             target.send "#{method}=", new_target
           else
-            new_target = target.send *method
-            (new_target = target.send "#{method}=", new_target) rescue nil # this can happen for example if you say TodoItems.all
+            new_target = target.send("#{method}=", target.send(method)) 
           end
           load_from_json(value, new_target) if new_target
         end
         target.save if target.respond_to? :save 
+
       end
       
       
