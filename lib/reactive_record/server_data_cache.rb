@@ -86,8 +86,9 @@ module ReactiveRecord
   
 
     class ServerDataCache
-      
-      def initialize
+            
+      def initialize(acting_user)
+        @acting_user = acting_user
         @cache = []
         @requested_cache_items = []
       end
@@ -95,7 +96,7 @@ module ReactiveRecord
       if RUBY_ENGINE != 'opal'
       
         def [](*vector)
-          root = CacheItem.new(@cache, vector[0])
+          root = CacheItem.new(@cache, @acting_user, vector[0])
           vector[1..-1].inject(root) { |cache_item, method| cache_item.apply_method method if cache_item }
           vector[0] = vector[0].constantize
           new_items = @cache.select { | cache_item | cache_item.root == root}
@@ -103,8 +104,8 @@ module ReactiveRecord
           new_items.last.value if new_items.last
         end
       
-        def self.[](vectors)
-          cache = new
+        def self.[](vectors, acting_user)
+          cache = new(acting_user)
           vectors.each { |vector| cache[*vector] }
           cache.as_json
         end
@@ -130,6 +131,7 @@ module ReactiveRecord
           attr_reader :vector
           attr_reader :record_chain
           attr_reader :root
+          attr_reader :acting_user
 
           def value 
             @ar_object
@@ -139,7 +141,7 @@ module ReactiveRecord
             vector.last
           end
           
-          def self.new(db_cache, klass)
+          def self.new(db_cache, acting_user, klass)
             klass_constant = klass.constantize
             if existing = db_cache.detect { |cached_item| cached_item.vector == [klass_constant] }
               return existing
@@ -147,9 +149,10 @@ module ReactiveRecord
             super
           end
 
-          def initialize(db_cache, klass)
+          def initialize(db_cache, acting_user, klass)
             klass = klass.constantize
             @db_cache = db_cache
+            @acting_user = acting_user
             @vector = [klass]
             @ar_object = klass
             @record_chain = []
@@ -161,6 +164,9 @@ module ReactiveRecord
           def apply_method_to_cache(method, &block)
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
+                if @ar_object.class < ActiveRecord::Base and @ar_object.attributes.has_key?(method)
+                  @ar_object.check_permission_with_acting_user(acting_user, :view_permitted?, method)
+                end
                 begin
                   new_ar_object = yield cache_item
                   cache_item.clone.instance_eval do
@@ -197,13 +203,8 @@ module ReactiveRecord
               else
                 apply_method_to_cache(method) {[]}
               end
-            else # @ar_object.respond_to? [*method].first 
-              puts "apply #{method} to #{@vector}" 
-              r = apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method) }# rescue nil } # rescue in case we are on a nil association
-              puts "representative method = #{r}"
-              r
-            #else
-             # self
+            else 
+              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method) }
             end
           end
           

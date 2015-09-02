@@ -17,6 +17,7 @@ else
   
   require "opal"
   require "reactive_record/version"
+  require "reactive_record/permissions"
   require "reactive_record/engine"
   require "reactive_record/server_data_cache"
   require "reactive_record/active_record/reactive_record/isomorphic_base"

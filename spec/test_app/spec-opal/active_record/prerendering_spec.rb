@@ -5,7 +5,7 @@ require 'address'
 require 'components/test'
 
 describe "prerendering" do
-
+  
   it "passes" do
     expect(true).to be_truthy
   end
@@ -28,6 +28,8 @@ describe "prerendering" do
         expect(mitch.address.zip).to eq("14617")
         expect(mitch.todo_items.find_string("mitch").first.title).to eq("a todo for mitch")
         expect(mitch.todo_items.first.commenters.first.email).to eq("adamg@catprint.com")
+        # clear out everything before moving on otherwise the initial data screws up the next test
+        `delete window.ReactiveRecordInitialData` 
       end
     end
     `container.load('/test', complete)`
@@ -40,6 +42,8 @@ describe "prerendering" do
       React::IsomorphicHelpers.load_context
       run_async do
         expect(User.find_by_email("mitch@catprint.com").last_name.to_s).to eq("")
+        # clear out everything before moving on otherwise there will be a pending load that screw up the next test
+        React::IsomorphicHelpers.load_context
       end
     end
     `container.load('/test', complete)`

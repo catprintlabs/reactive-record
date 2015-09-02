@@ -60,5 +60,27 @@ use_case "simple record update and save" do
       expect(mitchell).not_to be_saving
     end
   end
+  
+  now_it "is time to test for validation error handling" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.email = "mitch at catprint dot com"
+    mitch.save.then_test do |result|
+      expect(result[:success]).to be_falsy
+      expect(result[:message]).to be_present
+      expect(result[:saved_models].first.last.first).to eq("Email is invalid")
+    end
+  end
+  
+  and_it "gives the same result to a block" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.email = "mitch at catprint dot com"
+    mitch.save do |success, message, models|
+      test do
+        expect(success).to be_falsy
+        expect(message).to be_present
+        expect(models.first.last.first).to eq("Email is invalid")
+      end
+    end
+  end
     
 end

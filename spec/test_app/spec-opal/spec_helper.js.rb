@@ -6,6 +6,7 @@ require 'reactive-ruby'
 require 'reactive-record'
 require 'jquery'
 require 'opal-jquery'
+require 'jquery.cookie'
 
 
 #Opal::RSpec::Runner.autorun
@@ -211,15 +212,21 @@ module ReactTestHelpers
     run_async &block 
     Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
   end
+  
+  # for the permissions test
+  
+  def set_acting_user(email)
+    `$.cookie('acting_user', #{email}, { path: '/' })`
+  end
     
 end
 
 class Promise
   
   def then_test(&block)
-    self.then do |*args| 
+    self.then do |args| 
       Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async do 
-        yield *args
+        yield args
         Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
       end
     end

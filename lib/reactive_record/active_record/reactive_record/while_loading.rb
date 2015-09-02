@@ -23,14 +23,14 @@ module ReactiveRecord
     @loads_pending = true
   end
 
-  def self.run_blocks_to_load
+  def self.run_blocks_to_load(failure = nil)
     if @blocks_to_load
       blocks_to_load = @blocks_to_load
       @blocks_to_load = []
       blocks_to_load.each do |promise_and_block|
         @loads_pending = nil
-        result = promise_and_block.last.call
-        if @loads_pending
+        result = promise_and_block.last.call(failure)
+        if @loads_pending and !failure
           @blocks_to_load << promise_and_block
         else
           promise_and_block.first.resolve result

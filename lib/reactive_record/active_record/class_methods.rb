@@ -79,7 +79,9 @@ module ActiveRecord
     end
         
     [:belongs_to, :has_many, :has_one].each do |macro| 
-      define_method(macro) do |name, opts = {}| 
+      define_method(macro) do |*args| # is this a bug in opal?  saying name, scope=nil, opts={} does not work!
+        name = args.first
+        opts = args.last
         Associations::AssociationReflection.new(base_class, macro, name, opts)
       end
     end

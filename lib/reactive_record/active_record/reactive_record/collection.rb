@@ -13,6 +13,14 @@ module ReactiveRecord
       end
       @scopes = {}
     end
+    
+    def dup_for_sync
+      self.dup.instance_eval do
+        @collection = @collection.dup if @collection
+        @scopes = @scopes.dup
+        self
+      end
+    end
 
     def all
       @dummy_collection.notify if @dummy_collection
@@ -55,10 +63,10 @@ module ReactiveRecord
 
 
     def <<(item)
-      if @owner and @association and inverse_of = @association.inverse_of
+      backing_record = item.instance_variable_get(:@backing_record)
+      if backing_record and @owner and @association and inverse_of = @association.inverse_of
         item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
         item.attributes[inverse_of] = @owner
-        backing_record = item.instance_variable_get(:@backing_record)
         React::State.set_state(backing_record, inverse_of, @owner) unless backing_record.data_loading?
       end
       all << item unless all.include? item

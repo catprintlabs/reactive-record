@@ -6,10 +6,11 @@ module ReactiveRecord
     
     include React::IsomorphicHelpers
         
-    before_first_mount do
+    before_first_mount do |context|
       if RUBY_ENGINE != 'opal'
-        @server_data_cache = ReactiveRecord::ServerDataCache.new
+        @server_data_cache = ReactiveRecord::ServerDataCache.new(context.controller.acting_user)
       else
+        @fetch_scheduled = nil
         @records = Hash.new { |hash, key| hash[key] = [] }
         @class_scopes = Hash.new { |hash, key| hash[key] = {} }
         if on_opal_client? 
@@ -150,26 +151,31 @@ module ReactiveRecord
 
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.001) do
-        last_fetch_at = @last_fetch_at
-        pending_fetches = @pending_fetches.uniq
-        log(["Server Fetching: %o", pending_fetches.to_n])
-        start_time = Time.now
-        HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
-          fetch_time = Time.now
-          log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
-          begin
-            ReactiveRecord::Base.load_from_json(response.json)
-          rescue Exception => e
-            log("Exception raised while loading json from server: #{e}", :error)
+        if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches
+          last_fetch_at = @last_fetch_at
+          pending_fetches = @pending_fetches.uniq
+          log(["Server Fetching: %o", pending_fetches.to_n])
+          start_time = Time.now
+          HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
+            fetch_time = Time.now
+            log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
+            begin
+              ReactiveRecord::Base.load_from_json(response.json)
+            rescue Exception => e
+              log("Exception raised while loading json from server: #{e}", :error)
+            end
+            log("       Processed in: #{(Time.now-fetch_time).to_i}s")
+            log(["       Returned: %o", response.json.to_n])
+            ReactiveRecord.run_blocks_to_load
+            ReactiveRecord::WhileLoading.loaded_at last_fetch_at
+          end.fail do |response|
+            log("Fetch failed", :error)
+            ReactiveRecord.run_blocks_to_load(response.body)
           end
-          log("       Processed in: #{(Time.now-fetch_time).to_i}s")
-          log(["       Returned: %o", response.json.to_n])
-          ReactiveRecord.run_blocks_to_load
-          ReactiveRecord::WhileLoading.loaded_at last_fetch_at
-        end if @pending_fetches.count > 0
-        @pending_fetches = []
-        @last_fetch_at = Time.now
-        @fetch_scheduled = nil
+          @pending_fetches = []
+          @last_fetch_at = Time.now
+          @fetch_scheduled = nil
+        end
       end
     end
     
@@ -182,7 +188,7 @@ module ReactiveRecord
     if RUBY_ENGINE == 'opal'
       
       def save(&block) 
-
+        
         if data_loading?
 
           sync!
@@ -241,18 +247,29 @@ module ReactiveRecord
               internal_id, klass, attributes = item
               backing_records[internal_id].sync!(attributes)
             end
-            yield response.json[:success], response.json[:message] if block
-            promise.resolve response.json[:success], response.json[:message]
+            log("Reactive Record Save Failed: #{response.json[:message]}", :error) unless response.json[:success]
+            response.json[:saved_models].each do |model|
+              log("  Model: #{model[1]}  Attributes: #{model[2]}  Errors: #{model[3]}", :error) if model[3]
+            end
+            yield response.json[:success], response.json[:message], response.json[:saved_models]  if block
+            promise.resolve response.json
           end
+          promise
+        else
+          promise = Promise.new
+          yield true, nil if block
+          promise.resolve({success: true})
           promise
         end
       end
       
     else
       
-      def self.save_records(models, associations)
+      def self.save_records(models, associations, acting_user)
         
         reactive_records = {}
+        new_models = []
+        saved_models = []
 
         models.each do |model_to_save|
           attributes = model_to_save[:attributes]
@@ -262,43 +279,61 @@ module ReactiveRecord
             record = model.find(id)
             keys = record.attributes.keys
             attributes.each do |key, value|
-              record[key] = value if keys.include? key
+              if keys.include? key 
+                record[key] = value
+              else
+                record.send("#{key}=",value)
+              end
             end
             record
           else
             record = model.new
             keys = record.attributes.keys
             attributes.each do |key, value|
-              record[key] = value if keys.include? key
+              if keys.include? key 
+                record[key] = value
+              else
+                record.send("#{key}=",value)
+              end
             end
+            new_models << record
             record
           end
         end
         
-        associations.each do |association|
-          begin
-            if reactive_records[association[:parent_id]].class.reflect_on_aggregation(association[:attribute].to_sym)
-              reactive_records[association[:parent_id]].send("#{association[:attribute]}=", reactive_records[association[:child_id]])
-            elsif reactive_records[association[:parent_id]].class.reflect_on_association(association[:attribute].to_sym).collection?
-              reactive_records[association[:parent_id]].send("#{association[:attribute]}") << reactive_records[association[:child_id]]
+        ActiveRecord::Base.transaction do
+          
+          associations.each do |association|
+            parent = reactive_records[association[:parent_id]]
+            parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
+            if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
+              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
+              parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
             else
-              reactive_records[association[:parent_id]].send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
             end
-          end
-        end if associations 
+          end if associations 
+          
+          has_errors = false
 
-        saved_models = reactive_records.collect do |reactive_record_id, model|
-          unless model.frozen? 
-            saved = model.save
-            [reactive_record_id, model.class.name, model.attributes, saved]
-          end
-        end.compact
-      
-        {success: true, saved_models: saved_models || []}
+          saved_models = reactive_records.collect do |reactive_record_id, model|
+            unless model.frozen? 
+              saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save
+              has_errors ||= !saved
+              [reactive_record_id, model.class.name, model.attributes, (saved ? nil : model.errors.full_messages)]
+            end
+          end.compact
+          
+          raise "Could not save all models" if has_errors
+        
+        end
+        
+        {success: true, saved_models: saved_models }
       
       rescue Exception => e
         
-        {success: false, saved_models: saved_models || [], message: e.message}
+        {success: false, saved_models: saved_models, message: e.message}
         
       end
       
@@ -325,11 +360,11 @@ module ReactiveRecord
         if id or vector
           HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: ar_instance.model_name, id: id, vector: vector}).then do |response|
             yield response.json[:success], response.json[:message] if block
-            promise.resolve response.json[:success], response.json[:message]
+            promise.resolve response.json
           end
         else
           yield true, nil if block
-          promise.resolve true, nil
+          promise.resolve({success: true})
         end
         
         @attributes = {}
@@ -341,15 +376,16 @@ module ReactiveRecord
       
     else
       
-      def self.destroy_record(model, id, vector)
+      def self.destroy_record(model, id, vector, acting_user)
         model = Object.const_get(model)
         record = if id 
           model.find(id)
         else
-          ServerDataCache.new[*vector]
+          ServerDataCache.new(acting_user)[*vector]
         end
-        record.destroy
+        record.check_permission_with_acting_user(acting_user, :destroy_permitted?).destroy
         {success: true, attributes: {}}
+
       rescue Exception => e
         {success: false, record: record, message: e.message}
       end

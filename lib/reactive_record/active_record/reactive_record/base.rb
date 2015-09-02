@@ -43,10 +43,14 @@ module ReactiveRecord
       self.class.data_loading?
     end
     
+    def self.load_data(&block)
+      current_data_loading, @data_loading = [@data_loading, true]
+      yield
+      @data_loading = current_data_loading
+    end
+    
     def self.load_from_json(json, target = nil)
-      @data_loading = true
-      ServerDataCache.load_from_json(json, target)
-      @data_loading = false
+      load_data { ServerDataCache.load_from_json(json, target) }
     end
     
     def self.class_scopes(model)
@@ -100,9 +104,9 @@ module ReactiveRecord
     
     def initialize(model, hash = {}, ar_instance = nil)
       @model = model
-      @synced_attributes = {}
-      @attributes = hash
       @ar_instance = ar_instance
+      @synced_attributes = {}
+      @attributes = {}
       records[model] << self
     end
   
@@ -203,7 +207,7 @@ module ReactiveRecord
     def sync!(hash = {})
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
-      @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup if value.is_a? Collection }
+      @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup_for_sync if value.is_a? Collection }
       @saving = false
       React::State.set_state(self, self, :synced) unless data_loading?
       self

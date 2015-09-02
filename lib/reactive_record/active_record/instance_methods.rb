@@ -11,8 +11,11 @@ module ActiveRecord
         @backing_record = hash
       else
         # standard active_record new -> creates a new instance, primary key is ignored if present
-        hash[primary_key] = nil
-        @backing_record = ReactiveRecord::Base.new(self.class, hash, self)
+        # we have to build the backing record first then initialize it so associations work correctly
+        @backing_record = ReactiveRecord::Base.new(self.class, {}, self)
+        @backing_record.instance_eval do
+          self.class.load_data { hash.each { |attribute, value| reactive_set!(attribute, value) unless attribute == primary_key } }
+        end
       end
     end
     
