@@ -178,20 +178,25 @@ module ReactiveRecord
             end
           end
         end
+        was_changed = changed2(@attributes.dup)
         attributes[attribute] = value
         React::State.set_state(self, attribute, value) unless data_loading?
+        React::State.set_state(self, self, :changed) unless data_loading? or (was_changed == changed2({attribute => value}))
       end
       value
     end
-  
+    
     def changed?(*args)
-      attrs = if args.count == 0
+      changed2(if args.count == 0
         React::State.get_state(self, self)
         @attributes.dup
       else
         React::State.get_state(@attributes, args[0])
         {args[0] => @attributes[args[0]]}
-      end
+      end)
+    end
+  
+    def changed2(attrs)
       attrs.each do |attribute, value|
         if association = @model.reflect_on_association(attribute) and association.collection? and value
           return true unless value == @synced_attributes[attribute]

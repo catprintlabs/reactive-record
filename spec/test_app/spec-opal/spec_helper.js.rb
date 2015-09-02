@@ -125,7 +125,6 @@ module Opal
             def self.should_generate(opts={}, &block)
               sself = self
               @self.async(@title, opts) do
-                puts "inside async should generate"
                 expect_component_to_eventually(sself, &block)
               end
             end
@@ -200,11 +199,8 @@ module ReactTestHelpers
          element = nil; expect(true).to be(true) 
       end if element and context.instance_exec(element, &block) 
     end
-    puts "setting up after_update"
     component_class.after_update { check_block.call  }
-    puts "getting an element"
     element = build_element component_class, opts
-    puts "calling check_block"
     check_block.call
   end
   

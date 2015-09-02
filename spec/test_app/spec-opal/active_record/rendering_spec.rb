@@ -14,7 +14,6 @@ describe "integration with react" do
   end
 
   rendering("find by two methods gives same object once loaded") do
-    puts "now what!"
     r1 = User.find_by_email("mitch@catprint.com")
     r2 = User.find_by_first_name("Mitch")
     r1.id
@@ -65,5 +64,21 @@ describe "integration with react" do
   end.should_generate do
     html == "Rochester"
   end
-
+  
+  rendering("a record that is updated multiple times") do
+    @record ||= User.new
+    after(0.1) do
+      @record.counter = (@record.counter || 0) + 1
+    end
+    after(1) do
+      @record.all_done = true
+    end unless @record.changed?
+    if @record.all_done
+      @record.all_done = nil
+      "#{@record.counter}" 
+    end
+  end.should_generate do
+    html == "2"
+  end
+    
 end
