@@ -235,9 +235,9 @@ module ReactiveRecord
       @saving = true
     end
     
-    def saved!  # sets saving to false AND notifies
+    def saved!(failed = nil)  # sets saving to false AND notifies
       @saving = false
-      React::State.set_state(self, self, :saved) unless data_loading?
+      React::State.set_state(self, self, :saved) unless data_loading? or failed
       self
     end
     

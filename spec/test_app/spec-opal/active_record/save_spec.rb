@@ -86,5 +86,25 @@ use_case "simple record update and save" do
       end
     end
   end
+  
+  and_it "marks the record as not saving" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.email = "mitch at catprint dot com"
+    mitch.save do 
+      test do
+        expect(mitch).not_to be_saving
+      end
+    end
+  end
+  
+  and_it "is still changed" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.email = "mitch at catprint dot com"
+    mitch.save do 
+      test do
+        expect(mitch).to be_changed
+      end
+    end
+  end
     
 end
