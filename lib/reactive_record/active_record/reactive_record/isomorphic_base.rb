@@ -243,16 +243,23 @@ module ReactiveRecord
 
           HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
             
-            response.json[:saved_models].each do |item|
-              internal_id, klass, attributes = item
-              backing_records[internal_id].sync!(attributes)
+            if response.json[:success]
+              response.json[:saved_models].each do |item|
+                internal_id, klass, attributes = item
+                backing_records[internal_id].sync!(attributes)
+              end
+            else
+              log("Reactive Record Save Failed: #{response.json[:message]}", :error) 
+              response.json[:saved_models].each do |model|
+                log("  Model: #{model[1]}  Attributes: #{model[2]}  Errors: #{model[3]}", :error) if model[3]
+              end
             end
-            log("Reactive Record Save Failed: #{response.json[:message]}", :error) unless response.json[:success]
-            response.json[:saved_models].each do |model|
-              log("  Model: #{model[1]}  Attributes: #{model[2]}  Errors: #{model[3]}", :error) if model[3]
-            end
+            
             yield response.json[:success], response.json[:message], response.json[:saved_models]  if block
             promise.resolve response.json
+            
+            response.json[:saved_models].each { |item| backing_records[item[0]].saved! } if response.json[:success]
+            
           end
           promise
         else

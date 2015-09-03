@@ -209,12 +209,11 @@ module ReactiveRecord
       false
     end
   
-    def sync!(hash = {})
+    def sync!(hash = {})  # does NOT notify (see saved! for notification)
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
       @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup_for_sync if value.is_a? Collection }
       @saving = false
-      React::State.set_state(self, self, :synced) unless data_loading?
       self
     end
   
@@ -236,9 +235,19 @@ module ReactiveRecord
       @saving = true
     end
     
+    def saved!  # sets saving to false AND notifies
+      @saving = false
+      React::State.set_state(self, self, :saved) unless data_loading?
+      self
+    end
+    
     def saving?
       React::State.get_state(self, self)
       @saving
+    end
+    
+    def new?
+      !id and !vector
     end
   
     def find_association(association, id)
@@ -265,7 +274,7 @@ module ReactiveRecord
         
     def apply_method(method)
       # Fills in the value returned by sending "method" to the corresponding server side db instance
-      if id or vector
+      if !new?
         sync_attribute(
           method, 
           if association = @model.reflect_on_association(method)

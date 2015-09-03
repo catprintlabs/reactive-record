@@ -16,6 +16,10 @@ use_case "simple record update and save" do
     test {expect(User.find_by_email("mitch@catprint.com")).not_to be_changed}
   end
   
+  and_it "knows mitch is not new" do
+    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_new}
+  end
+  
   and_it "doesn't find mitch saving" do
     test {expect(User.find_by_email("mitch@catprint.com")).not_to be_saving}
   end

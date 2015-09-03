@@ -29,6 +29,11 @@ use_case "creating and updating a record" do
     test { expect(jon.id).to be_nil }
   end
   
+  and_it "is new" do  
+    jon = User.find_by_first_name("Jon")
+    test { expect(jon).to be_new }
+  end
+    
   and_it "has been changed" do
     jon = User.find_by_first_name("Jon")
     test { expect(jon.changed?).to be_truthy }
