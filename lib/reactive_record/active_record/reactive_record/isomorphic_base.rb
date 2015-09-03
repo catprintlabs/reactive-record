@@ -242,25 +242,28 @@ module ReactiveRecord
           promise = Promise.new
 
           HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
-            
+            begin
+            response.json[:models] = response.json[:saved_models].collect do |item|
+              backing_records[item[0]].ar_instance
+            end
+
             if response.json[:success]
-              response.json[:saved_models].each do |item|
-                internal_id, klass, attributes = item
-                backing_records[internal_id].sync!(attributes)
-              end
+              response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
             else
-              backing_records.each { |item| backing_records[item[0]].saved! false }
+              response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] }
               log("Reactive Record Save Failed: #{response.json[:message]}", :error) 
-              response.json[:saved_models].each do |model|
-                log("  Model: #{model[1]}  Attributes: #{model[2]}  Errors: #{model[3]}", :error) if model[3]
+              response.json[:saved_models].each do | item |
+                log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
               end
             end
-            
-            yield response.json[:success], response.json[:message], response.json[:saved_models]  if block
+
+            yield response.json[:success], response.json[:message], response.json[:models]  if block
             promise.resolve response.json
             
-            backing_records.each { |item| backing_records[item[0]].saved! } if response.json(:success)
-            
+            backing_records.each { |id, record| record.saved! } if response.json(:success)
+          rescue Exception => e
+            puts "whahhh #{e}"
+          end
           end
           promise
         else
@@ -329,7 +332,7 @@ module ReactiveRecord
             unless model.frozen? 
               saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save
               has_errors ||= !saved
-              [reactive_record_id, model.class.name, model.attributes, (saved ? nil : model.errors.full_messages)]
+              [reactive_record_id, model.class.name, model.attributes, (saved ? nil : model.errors.messages)]
             end
           end.compact
           

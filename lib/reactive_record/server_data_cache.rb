@@ -211,7 +211,11 @@ module ReactiveRecord
           def as_hash(children = [@ar_object])
             if @parent
               if method == "*"
-                @parent.as_hash({@ar_object.id => children})
+                if @ar_object.is_a? Array  # this happens when a scope is empty there is test case, but
+                  @parent.as_hash({})      # does it work for all edge cases?  
+                else
+                  @parent.as_hash({@ar_object.id => children})
+                end
               elsif @ar_object.class < ActiveRecord::Base and children.is_a? Hash
                 @parent.as_hash({method => children.merge({
                   :id => [@ar_object.id], 

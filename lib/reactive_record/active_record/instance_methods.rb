@@ -77,6 +77,10 @@ module ActiveRecord
       @backing_record.new?
     end
     
+    def errors
+      @backing_record.errors
+    end
+    
   end
   
 end

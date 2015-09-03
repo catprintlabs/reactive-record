@@ -65,24 +65,48 @@ use_case "simple record update and save" do
     end
   end
   
-  now_it "is time to test for validation error handling" do
+  
+  now_it "changes the name back to mitchell and we check what is sent to the block" do
     mitch = User.find_by_email("mitch@catprint.com")
-    mitch.email = "mitch at catprint dot com"
-    mitch.save.then_test do |result|
-      expect(result[:success]).to be_falsy
-      expect(result[:message]).to be_present
-      expect(result[:saved_models].first.last.first).to eq("Email is invalid")
+    mitch.first_name = "Mitchell"
+    mitch.save do | success, message, models |
+      test do
+        expect(success).to be_truthy
+        expect(message).to be_nil
+        expect(models).to eq([mitch])
+        expect(mitch.errors).to be_empty
+      end
     end
   end
   
-  and_it "gives the same result to a block" do
+  now_it "changes the name back to mitch and we check what is sent to the promise" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.first_name = "Mitch"
+    mitch.save.then_test do | response |
+      expect(response[:success]).to be_truthy
+      expect(response[:message]).to be_nil
+      expect(response[:models]).to eq([mitch])
+    end
+  end
+  
+  now_it "is time to test for validation error handling" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.email = "mitch at catprint dot com"
     mitch.save do |success, message, models|
       test do
         expect(success).to be_falsy
         expect(message).to be_present
-        expect(models.first.last.first).to eq("Email is invalid")
+        expect(models).to eq([mitch])
+      end
+    end
+  end
+  
+  and_it "puts the errors in the errors object" do
+    mitch = User.find_by_email("mitch@catprint.com")
+    mitch.email = "mitch at catprint dot com"
+    mitch.save do |success, message, models|
+      test do
+        expect(mitch.errors[:email]).to eq(["is invalid"])
       end
     end
   end

@@ -20,5 +20,15 @@ use_case "can scope models" do
       expect(count).to be(1)
     end
   end
+  
+  and_it "works for an empty set" do
+    ReactiveRecord.load do
+      User.find_by_email("adamg@catprint.com").todo_items.find_string("mitch").find_string("another").collect do |item|
+        item.title
+      end
+    end.then_test do |result|
+      expect(result).to eq([])
+    end
+  end
 
 end

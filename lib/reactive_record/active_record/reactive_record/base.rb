@@ -208,12 +208,18 @@ module ReactiveRecord
       end
       false
     end
+    
+    
+    def errors
+      @errors ||= ActiveModel::Error.new
+    end
   
     def sync!(hash = {})  # does NOT notify (see saved! for notification)
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
       @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup_for_sync if value.is_a? Collection }
       @saving = false
+      @errors = nil
       self
     end
   
@@ -228,6 +234,7 @@ module ReactiveRecord
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
       end
       @attributes.delete_if { |attribute, value| !@synced_attributes.has_key?(attribute) }
+      @errors = nil
     end
     
     def saving! 
@@ -235,9 +242,10 @@ module ReactiveRecord
       @saving = true
     end
     
-    def saved!(failed = nil)  # sets saving to false AND notifies
+    def saved!(errors = nil)  # sets saving to false AND notifies
       @saving = false
-      React::State.set_state(self, self, :saved) unless data_loading? or failed
+      React::State.set_state(self, self, :saved) unless data_loading? or errors
+      @errors = ActiveModel::Error.new(errors)
       self
     end
     
