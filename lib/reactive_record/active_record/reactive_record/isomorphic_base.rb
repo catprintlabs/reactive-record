@@ -225,8 +225,10 @@ module ReactiveRecord
               if association = record.model.reflect_on_association(attribute)
                 if association.collection? 
                   value.each { |assoc| add_new_association.call record, attribute, assoc.instance_variable_get(:@backing_record) }
-                else
+                elsif value
                   add_new_association.call record, attribute, value.instance_variable_get(:@backing_record)
+                else
+                  output_attributes[attribute] = nil
                 end
               elsif record.model.reflect_on_aggregation(attribute)
                 add_new_association.call record, attribute, value.instance_variable_get(:@backing_record)

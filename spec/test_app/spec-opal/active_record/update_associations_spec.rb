@@ -82,6 +82,32 @@ use_case "updating associations" do
     end
   end
   
+  now_it "can be assigned to nobody" do
+    todo = TodoItem.find_by_title("Jon's first todo!")
+    todo.user = nil
+    todo.save do | success |
+      test { expect(success).to be_truthy }
+    end
+  end
+  
+  and_it "will not belong to Jan anymore" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      TodoItem.find_by_title("Jon's first todo!").user # load the todo in prep for the next test
+      User.find_by_first_name("Jan").todo_items.count
+    end.then_test do |count|
+      expect(count).to be(0)
+    end
+  end
+  
+  and_it "can be reassigned to Jan" do
+    todo = TodoItem.find_by_title("Jon's first todo!")
+    todo.user = User.find_by_first_name("Jan")
+    todo.save do | success |
+      test { expect(success).to be_truthy }
+    end
+  end
+  
   now_it "can be deleted" do
     User.find_by_first_name("Jan").todo_items.first.destroy.then_test do
       expect(User.find_by_first_name("Jan").todo_items).to be_empty
