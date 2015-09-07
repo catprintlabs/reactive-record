@@ -7,6 +7,7 @@ require 'reactive-record'
 require 'jquery'
 require 'opal-jquery'
 require 'jquery.cookie'
+require 'models'
 
 
 #Opal::RSpec::Runner.autorun

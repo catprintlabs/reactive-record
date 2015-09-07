@@ -245,27 +245,27 @@ module ReactiveRecord
 
           HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
             begin
-            response.json[:models] = response.json[:saved_models].collect do |item|
-              backing_records[item[0]].ar_instance
-            end
-
-            if response.json[:success]
-              response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
-            else
-              response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] }
-              log("Reactive Record Save Failed: #{response.json[:message]}", :error) 
-              response.json[:saved_models].each do | item |
-                log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
+              response.json[:models] = response.json[:saved_models].collect do |item|
+                backing_records[item[0]].ar_instance
               end
-            end
 
-            yield response.json[:success], response.json[:message], response.json[:models]  if block
-            promise.resolve response.json
+              if response.json[:success]
+                response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
+              else
+                response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] }
+                log("Reactive Record Save Failed: #{response.json[:message]}", :error) 
+                response.json[:saved_models].each do | item |
+                  log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
+                end
+              end
+
+              yield response.json[:success], response.json[:message], response.json[:models]  if block
+              promise.resolve response.json
             
-            backing_records.each { |id, record| record.saved! } if response.json(:success)
-          rescue Exception => e
-            puts "whahhh #{e}"
-          end
+              backing_records.each { |id, record| record.saved! } if response.json[:success]
+            rescue Exception => e
+              puts "Save Failed: #{e}"
+            end
           end
           promise
         else

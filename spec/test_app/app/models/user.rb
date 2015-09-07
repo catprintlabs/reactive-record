@@ -1,5 +1,3 @@
-require 'shared/user'
-
 class User < ActiveRecord::Base
   
   def as_json(*args)
@@ -15,3 +13,5 @@ class User < ActiveRecord::Base
   end
   
 end
+
+

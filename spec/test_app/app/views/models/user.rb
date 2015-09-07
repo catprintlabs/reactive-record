@@ -1,10 +1,8 @@
-require 'address'
-
 class User < ActiveRecord::Base
-  
+    
   def view_permitted?(attribute)
     return self == acting_user if acting_user
-    super  # we call super to test if its there  not really the right way to do it, see comments or todo_items
+    super  # we call super to test if its there (just for the spec) not really the right way to do it, see comments or todo_items
   end
   
   has_many :todo_items

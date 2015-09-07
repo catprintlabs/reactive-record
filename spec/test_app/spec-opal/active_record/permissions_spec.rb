@@ -1,7 +1,7 @@
 require 'spec_helper'
-require 'user'
-require 'todo_item'
-require 'comment'
+#require 'user'
+#require 'todo_item'
+#require 'comment'
 
 # for testing convienience we do an odd thing:  if acting_user is nil we treat it as a super user
 # other wise we can provide an email which will be converted by the application controller into the acting_user

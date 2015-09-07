@@ -64,9 +64,6 @@ module ReactiveRecord
       model = model.base_class
       # already have a record with this attribute-value pair?
       record = @records[model].detect { |record| record.attributes[attribute] == value}
-      if !record and attribute == 'id' and !@disabled_debugging
-       # `debugger`
-      end
       unless record
         # if not, and then the record may be loaded, but not have this attribute set yet,
         # so find the id of of record with the attribute-value pair, and see if that is loaded.
@@ -244,8 +241,13 @@ module ReactiveRecord
     
     def saved!(errors = nil)  # sets saving to false AND notifies
       @saving = false
-      React::State.set_state(self, self, :saved) unless data_loading? or errors
       @errors = ActiveModel::Error.new(errors)
+      if errors
+        #errors.each { |attribute, error| React::State.set_state(self, attribute, attributes[attribute]) }
+        React::State.set_state(self, self, :errors)
+      elsif !data_loading? 
+        React::State.set_state(self, self, :saved)
+      end
       self
     end
     

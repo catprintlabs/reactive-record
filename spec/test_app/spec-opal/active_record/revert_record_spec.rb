@@ -1,6 +1,6 @@
 require 'spec_helper'
-require 'user'
-require 'todo_item'
+#require 'user'
+#require 'todo_item'
 
 use_case "reverting records" do
   

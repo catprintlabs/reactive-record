@@ -1,11 +1,6 @@
-require 'user'
-require 'todo_item'
-
 class Test
 
   include React::Component
-
-  export_component
 
   def render
     user = User.find_by_email("mitch@catprint.com")

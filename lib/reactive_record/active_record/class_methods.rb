@@ -81,7 +81,7 @@ module ActiveRecord
     [:belongs_to, :has_many, :has_one].each do |macro| 
       define_method(macro) do |*args| # is this a bug in opal?  saying name, scope=nil, opts={} does not work!
         name = args.first
-        opts = args.last
+        opts = (args.count > 1 and args.last.is_a? Hash) ? args.last : {}
         Associations::AssociationReflection.new(base_class, macro, name, opts)
       end
     end
@@ -92,7 +92,7 @@ module ActiveRecord
 
     [
       "table_name=", "before_validation", "with_options", "validates_presence_of", "validates_format_of", 
-      "accepts_nested_attributes_for", "after_create", "before_save", "before_destroy", "where", "validate", 
+      "accepts_nested_attributes_for", "before_create", "after_create", "before_save", "after_save", "before_destroy", "where", "validate", 
       "attr_protected", "validates_numericality_of", "default_scope", "has_attached_file", "attr_accessible",
       "serialize"
     ].each do |method|
@@ -107,11 +107,11 @@ module ActiveRecord
         param
       elsif param.is_a? Hash
         if opt == :validate_only
-          ReactiveRecord::Base.infer_type_from_hash(self, param) == self
+          klass = ReactiveRecord::Base.infer_type_from_hash(self, param)
+          klass == self or klass < self
         else
           target = find(param[primary_key])
-          param.each { |key, value| param[key] = [value] }
-          ReactiveRecord::Base.load_from_json(param, target)
+          ReactiveRecord::Base.load_from_json(Hash[param.collect { |key, value| [key, [value]] }], target)
           target
         end
       else

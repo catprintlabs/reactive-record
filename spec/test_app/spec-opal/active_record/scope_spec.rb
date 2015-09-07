@@ -1,6 +1,6 @@
 require 'spec_helper'
-require 'user'
-require 'todo_item'
+#require 'user'
+#require 'todo_item'
 
 use_case "can scope models" do
 
@@ -24,6 +24,19 @@ use_case "can scope models" do
   and_it "works for an empty set" do
     ReactiveRecord.load do
       User.find_by_email("adamg@catprint.com").todo_items.find_string("mitch").find_string("another").collect do |item|
+        item.title
+      end
+    end.then_test do |result|
+      expect(result).to eq([])
+    end
+  end
+  
+  
+  and_it "works for an empty set even if other items are retrieved" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      user = User.find(3)
+      user.todo_items.find_string("mitch").find_string("another").collect do |item|
         item.title
       end
     end.then_test do |result|

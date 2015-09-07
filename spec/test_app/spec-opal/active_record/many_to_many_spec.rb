@@ -1,6 +1,6 @@
 require 'spec_helper'
-require 'todo_item'
-require 'user'
+#require 'todo_item'
+#require 'user'
 
 use_case "many to many associations" do
   

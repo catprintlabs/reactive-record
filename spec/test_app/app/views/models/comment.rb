@@ -1,6 +1,9 @@
 class Comment < ActiveRecord::Base
   
-  def create_permitted?
+  def create_permitted?  
+    # for testing we allow anything if there is no acting_user
+    # in the real world you would have something like this:
+    # acting_user and (acting_user.admin? or user_is? acting_user)
     !acting_user or user_is? acting_user
   end
   

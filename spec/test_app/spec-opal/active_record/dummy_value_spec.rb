@@ -1,5 +1,5 @@
 require 'spec_helper'
-require 'user'
+#require 'user'
 
 
 describe "dummy values" do

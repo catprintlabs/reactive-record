@@ -1,5 +1,5 @@
 require 'spec_helper'
-require 'user'
+#require 'user'
 
 use_case "simple record update and save" do
   

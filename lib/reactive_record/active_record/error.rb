@@ -13,6 +13,10 @@ module ActiveModel
       messages[attribute]
     end
     
+    def delete(attribute)
+      messages.delete(attribute)
+    end
+    
     def empty?
       messages.empty?
     end

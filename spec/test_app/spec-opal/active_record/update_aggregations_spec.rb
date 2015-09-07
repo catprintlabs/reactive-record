@@ -1,7 +1,7 @@
 require 'spec_helper'
-require 'user'
-require 'todo_item'
-require 'address'
+#require 'user'
+#require 'todo_item'
+#require 'address'
 
 use_case "updating aggregations" do
   
