@@ -251,8 +251,9 @@ module ReactiveRecord
             new_target = target.send *method unless value.is_a? Array # value is an array if scope returns nil
           elsif value.is_a? Array
             target.send "#{method}=", value.first
-          elsif value.is_a? Hash and value[:id] and value[:id].first
-            new_target = target.class.reflect_on_association(method).klass.find(value[:id].first)
+          elsif value.is_a? Hash and value[:id] and value[:id].first #and 
+            association = target.class.reflect_on_association(method)
+            new_target = association.klass.find(value[:id].first)
             target.send "#{method}=", new_target
           else
             new_target = target.send("#{method}=", target.send(method)) 

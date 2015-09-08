@@ -78,6 +78,7 @@ module ReactiveRecord
       # rendering cycle completes.  
       # takes care of informing react that there are things to load, and schedules the loader to run
       # Note there is no equivilent to find_in_db, because each vector implicitly does a find.
+      raise "attempt to do a find_by_id of nil.  This will return all records, and is not allowed" if vector[1] == ["find_by_id", nil]
       unless data_loading?
         @pending_fetches << vector
         schedule_fetch

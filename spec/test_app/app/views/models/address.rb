@@ -1,6 +1,6 @@
 class Address < ActiveRecord::Base
   
-  MAPPED_FIELDS = %w(street city state zip)
+  MAPPED_FIELDS = %w(id street city state zip)
   
   def self.compose(*args)
     new.tap do |address|

@@ -110,7 +110,11 @@ module ActiveRecord
           klass = ReactiveRecord::Base.infer_type_from_hash(self, param)
           klass == self or klass < self
         else
-          target = find(param[primary_key])
+          if param[primary_key]
+            target = find(param[primary_key])
+          else
+            target = new
+          end
           ReactiveRecord::Base.load_from_json(Hash[param.collect { |key, value| [key, [value]] }], target)
           target
         end
