@@ -37,7 +37,7 @@ module ActiveRecord
       def inverse_of
         unless @options[:through] or @inverse_of
           inverse_association = klass.reflect_on_all_associations.detect do | association | 
-            association.association_foreign_key == @association_foreign_key and association.klass.base_class == @owner_class.base_class
+            association.association_foreign_key == @association_foreign_key and association.klass.base_class == @owner_class.base_class and association.attribute != attribute
           end
           raise "Association #{@owner_class}.#{attribute} (foreign_key: #{@association_foreign_key}) has no inverse in #{@klass_name}" unless inverse_association
           @inverse_of = inverse_association.attribute
