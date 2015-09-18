@@ -3,9 +3,9 @@ require 'json'
 module ReactiveRecord
 
   class Base
-    
+
     include React::IsomorphicHelpers
-        
+
     before_first_mount do |context|
       if RUBY_ENGINE != 'opal'
         @server_data_cache = ReactiveRecord::ServerDataCache.new(context.controller.acting_user)
@@ -13,7 +13,7 @@ module ReactiveRecord
         @fetch_scheduled = nil
         @records = Hash.new { |hash, key| hash[key] = [] }
         @class_scopes = Hash.new { |hash, key| hash[key] = {} }
-        if on_opal_client? 
+        if on_opal_client?
           @pending_fetches = []
           @last_fetch_at = Time.now
           unless `typeof window.ReactiveRecordInitialData === 'undefined'`
@@ -25,25 +25,25 @@ module ReactiveRecord
         end
       end
     end
-    
+
     def records
       self.class.instance_variable_get(:@records)
     end
-    
+
     # Prerendering db access (returns nil if on client):
     # at end of prerendering dumps all accessed records in the footer
-    
+
     isomorphic_method(:fetch_from_db) do |f, vector|
       # vector must end with either "*all", or be a simple attribute
       f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
       f.when_on_server { @server_data_cache[*vector] }
     end
-    
+
     isomorphic_method(:find_in_db) do |f, klass, attribute, value|
       f.send_to_server klass.name, attribute, value if  RUBY_ENGINE == 'opal'
       f.when_on_server { @server_data_cache[klass, ["find_by_#{attribute}", value], :id] }
     end
-    
+
     prerender_footer do
       if @server_data_cache
         json = @server_data_cache.as_json.to_json  # can this just be to_json?
@@ -51,7 +51,7 @@ module ReactiveRecord
       else
         json = {}.to_json
       end
-      path = ::Rails.application.routes.routes.detect do |route| 
+      path = ::Rails.application.routes.routes.detect do |route|
         # not sure why the second check is needed.  It happens in the test app
         route.app == ReactiveRecord::Engine or (route.app.respond_to?(:app) and route.app.app == ReactiveRecord::Engine)
       end.path.spec
@@ -61,13 +61,13 @@ module ReactiveRecord
         "window.ReactiveRecordInitialData.push(#{json})\n"+
       "</script>\n"
     end if RUBY_ENGINE != 'opal'
-    
+
     # Client side db access (never called during prerendering):
-    
+
     # Always returns an object of class DummyValue which will act like most standard AR field types
     # Whenever a dummy value is accessed it notify React that there are loads pending so appropriate rerenders
     # will occur when the value is eventually loaded.
-    
+
     # queue up fetches, and at the end of each rendering cycle fetch the records
     # notify that loads are pending
 
@@ -75,7 +75,7 @@ module ReactiveRecord
       return nil unless on_opal_client? # this can happen when we are on the server and a nil value is returned for an attribute
       # only called from the client side
       # pushes the value of vector onto the a list of vectors that will be loaded from the server when the next
-      # rendering cycle completes.  
+      # rendering cycle completes.
       # takes care of informing react that there are things to load, and schedules the loader to run
       # Note there is no equivilent to find_in_db, because each vector implicitly does a find.
       raise "attempt to do a find_by_id of nil.  This will return all records, and is not allowed" if vector[1] == ["find_by_id", nil]
@@ -85,20 +85,20 @@ module ReactiveRecord
       end
       DummyValue.new
     end
-    
+
     class DummyValue < NilClass
-      
+
       def notify
         unless ReactiveRecord::Base.data_loading?
           ReactiveRecord.loads_pending!
           ReactiveRecord::WhileLoading.loading!
         end
       end
-      
+
       def initialize()
         notify
       end
-      
+
       def method_missing(method, *args, &block)
         if 0.respond_to? method
           notify
@@ -110,45 +110,45 @@ module ReactiveRecord
           super
         end
       end
-      
+
       def coerce(s)
         [self.send("to_#{s.class.name.downcase}"), s]
       end
-      
+
       def ==(other_value)
         other_value.is_a? DummyValue
       end
-      
-      def to_s 
+
+      def to_s
         notify
         ""
       end
-      
+
       def to_f
         notify
         0.0
       end
-      
+
       def to_i
         notify
         0
       end
-      
+
       def to_numeric
         notify
         0
       end
-      
+
       def to_date
         "2001-01-01T00:00:00.000-00:00".to_date
       end
-      
+
       def acts_as_string?
         true
       end
-      
+
     end
-    
+
 
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.001) do
@@ -179,23 +179,23 @@ module ReactiveRecord
         end
       end
     end
-    
+
     def self.get_type_hash(record)
       {record.class.inheritance_column => record[record.class.inheritance_column]}
     end
-    
+
     # save records
-    
+
     if RUBY_ENGINE == 'opal'
-      
-      def save(&block) 
-        
+
+      def save(&block)
+
         if data_loading?
 
           sync!
 
         elsif changed?
-          
+
           # we want to pass not just the model data to save, but also enough information so that on return from the server
           # we can update the models on the client
 
@@ -203,9 +203,9 @@ module ReactiveRecord
           records_to_process = [self]  # list of records to process, will grow as we chase associations
           # outputs
           models = [] # the actual data to save {id: record.object_id, model: record.model.model_name, attributes: changed_attributes}
-          associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}  
-          # used to keep track of records that have been processed for effeciency     
-          backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record  
+          associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
+          # used to keep track of records that have been processed for effeciency
+          backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record
 
           add_new_association = lambda do |record, attribute, assoc_record|
             if assoc_record.changed?
@@ -224,7 +224,7 @@ module ReactiveRecord
             models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes}
             record.attributes.each do |attribute, value|
               if association = record.model.reflect_on_association(attribute)
-                if association.collection? 
+                if association.collection?
                   value.each { |assoc| add_new_association.call record, attribute, assoc.instance_variable_get(:@backing_record) }
                 elsif value
                   add_new_association.call record, attribute, value.instance_variable_get(:@backing_record)
@@ -239,9 +239,9 @@ module ReactiveRecord
             end
             record_index += 1
           end
-          
+
           backing_records.each { |id, record| record.saving! }
-          
+
           promise = Promise.new
 
           HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
@@ -254,7 +254,7 @@ module ReactiveRecord
                 response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
               else
                 response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] }
-                log("Reactive Record Save Failed: #{response.json[:message]}", :error) 
+                log("Reactive Record Save Failed: #{response.json[:message]}", :error)
                 response.json[:saved_models].each do | item |
                   log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
                 end
@@ -262,7 +262,7 @@ module ReactiveRecord
 
               yield response.json[:success], response.json[:message], response.json[:models]  if block
               promise.resolve response.json
-            
+
               backing_records.each { |id, record| record.saved! } if response.json[:success]
             rescue Exception => e
               puts "Save Failed: #{e}"
@@ -276,11 +276,11 @@ module ReactiveRecord
           promise
         end
       end
-      
+
     else
-      
+
       def self.save_records(models, associations, acting_user)
-        
+
         reactive_records = {}
         new_models = []
         saved_models = []
@@ -293,7 +293,7 @@ module ReactiveRecord
             record = model.find(id)
             keys = record.attributes.keys
             attributes.each do |key, value|
-              if keys.include? key 
+              if keys.include? key
                 record[key] = value
               else
                 record.send("#{key}=",value)
@@ -304,7 +304,7 @@ module ReactiveRecord
             record = model.new
             keys = record.attributes.keys
             attributes.each do |key, value|
-              if keys.include? key 
+              if keys.include? key
                 record[key] = value
               else
                 record.send("#{key}=",value)
@@ -314,9 +314,9 @@ module ReactiveRecord
             record
           end
         end
-        
+
         ActiveRecord::Base.transaction do
-          
+
           associations.each do |association|
             parent = reactive_records[association[:parent_id]]
             parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
@@ -327,36 +327,36 @@ module ReactiveRecord
             else
               parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
             end
-          end if associations 
-          
+          end if associations
+
           has_errors = false
 
           saved_models = reactive_records.collect do |reactive_record_id, model|
-            unless model.frozen? 
+            unless model.frozen?
               saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save
               has_errors ||= !saved
               [reactive_record_id, model.class.name, model.attributes, (saved ? nil : model.errors.messages)]
             end
           end.compact
-          
+
           raise "Could not save all models" if has_errors
-        
+
         end
-        
+
         {success: true, saved_models: saved_models }
-      
+
       rescue Exception => e
-        
+
         {success: false, saved_models: saved_models, message: e.message}
-        
+
       end
-      
+
     end
-    
+
     # destroy records
-    
+
     if RUBY_ENGINE == 'opal'
-      
+
       def destroy(&block)
 
         return if @destroyed
@@ -380,19 +380,19 @@ module ReactiveRecord
           yield true, nil if block
           promise.resolve({success: true})
         end
-        
+
         @attributes = {}
         sync!
         @destroyed = true
-        
+
         promise
       end
-      
+
     else
-      
+
       def self.destroy_record(model, id, vector, acting_user)
         model = Object.const_get(model)
-        record = if id 
+        record = if id
           model.find(id)
         else
           ServerDataCache.new(acting_user)[*vector]
@@ -403,7 +403,7 @@ module ReactiveRecord
       rescue Exception => e
         {success: false, record: record, message: e.message}
       end
-      
+
     end
   end
 
