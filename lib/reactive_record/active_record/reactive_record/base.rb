@@ -29,6 +29,9 @@ module ReactiveRecord
     attr_accessor :ar_instance
     attr_accessor :vector
     attr_accessor :model
+    attr_accessor :changed_attributes
+    attr_accessor :aggregate_owner
+    attr_accessor :aggregate_attribute
 
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -84,7 +87,7 @@ module ReactiveRecord
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
     end
 
-    def self.new_from_vector(model, aggregate_method, *vector)
+    def self.new_from_vector(model, aggregate_owner, *vector)
       # this is the equivilent of find but for associations and aggregations
       # because we are not fetching a specific attribute yet, there is NO communication with the
       # server.  That only happens during find.
@@ -97,6 +100,8 @@ module ReactiveRecord
         record = new model
         record.vector = vector
       end
+      record.aggregate_owner = aggregate_owner
+      record.aggregate_attribute = vector.last
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
     end
 
@@ -105,6 +110,7 @@ module ReactiveRecord
       @ar_instance = ar_instance
       @synced_attributes = {}
       @attributes = {}
+      @changed_attributes = []
       records[model] << self
     end
 
@@ -174,38 +180,56 @@ module ReactiveRecord
               attributes[attribute].attributes[inverse_of] = nil
             end
           end
+        elsif @model.reflect_on_aggregation(attribute)
+          attributes[attribute].instance_variable_get(:@backing_record).aggregate_owner = nil if attributes[attribute]
+          aggregate = value.instance_variable_get(:@backing_record)
+          aggregate.aggregate_owner = self
+          aggregate.aggregate_attribute = attribute
         end
-        was_changed = changed2(@attributes.dup)
-        attributes[attribute] = value
-        React::State.set_state(self, attribute, value) unless data_loading?
-        React::State.set_state(self, self, :changed) unless data_loading? or (was_changed == changed2({attribute => value}))
+        update_attribute(attribute, value)
       end
       value
     end
 
-    def changed?(*args)
-      changed2(if args.count == 0
-        React::State.get_state(self, self)
-        @attributes.dup
+    def update_attribute(attribute, *args)
+      puts "update_attribute(#{attribute}, #{args})"
+      value = args[0]
+      changed = if args.count == 0
+        if association = @model.reflect_on_association(attribute) and association.collection?
+          attributes[attribute] != @synced_attributes[attribute]
+        else
+          !attributes[attribute].instance_variable_get(:@backing_record).changed_attributes.empty?
+        end
+      elsif association = @model.reflect_on_association(attribute) and association.collection?
+        value != @synced_attributes[attribute]
       else
-        React::State.get_state(@attributes, args[0])
-        {args[0] => @attributes[args[0]]}
-      end)
-    end
-
-    def changed2(attrs)
-      attrs.each do |attribute, value|
-        if association = @model.reflect_on_association(attribute) and association.collection? and value
-          return true unless value == @synced_attributes[attribute]
-        elsif !@synced_attributes.has_key?(attribute)
-          return true
-        elsif @synced_attributes[attribute] != value
-          return true
+        !@synced_attributes.has_key?(attribute) or @synced_attributes[attribute] != value
+      end
+      empty_before = changed_attributes.empty?
+      if !changed
+        changed_attributes.delete(attribute)
+      elsif !changed_attributes.include?(attribute)
+        changed_attributes << attribute
+      end
+      attributes[attribute] = value if args.count != 0
+      unless data_loading?
+        React::State.set_state(self, attribute, value)
+        if empty_before != changed_attributes.empty?
+          React::State.set_state(self, self, :changed)
+          aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
         end
       end
-      false
     end
 
+    def changed?(*args)
+      if args.count == 0
+        React::State.get_state(self, self)
+        !changed_attributes.empty?
+      else
+        React::State.get_state(self, args[0])
+        changed_attributes.include? args[0]
+      end
+    end
 
     def errors
       @errors ||= ActiveModel::Error.new
@@ -215,6 +239,7 @@ module ReactiveRecord
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
       @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup_for_sync if value.is_a? Collection }
+      @changed_attributes = []
       @saving = false
       @errors = nil
       self
@@ -223,14 +248,17 @@ module ReactiveRecord
     def sync_attribute(attribute, value)
       @synced_attributes[attribute] = attributes[attribute] = value
       @synced_attributes[attribute] = value.dup if value.is_a? ReactiveRecord::Collection
+      @changed_attributes.delete(attribute)
       value
     end
 
     def revert
       @attributes.each do |attribute, value|
+        puts "reverting #{attribute} from #{value} to #{@synced_attributes[attribute]}"
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
       end
       @attributes.delete_if { |attribute, value| !@synced_attributes.has_key?(attribute) }
+      @changed_attributes = []
       @errors = nil
     end
 
@@ -243,7 +271,6 @@ module ReactiveRecord
       @saving = false
       @errors = ActiveModel::Error.new(errors)
       if errors
-        #errors.each { |attribute, error| React::State.set_state(self, attribute, attributes[attribute]) }
         React::State.set_state(self, self, :errors)
       elsif !data_loading?
         React::State.set_state(self, self, :saved)

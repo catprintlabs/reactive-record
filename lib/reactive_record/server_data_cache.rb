@@ -236,6 +236,7 @@ module ReactiveRecord
       end
 
       def self.load_from_json(tree, target = nil)
+        puts "load_from_json(#{tree}, #{target})"
         ignore_all = nil
         tree.each do |method, value|
           method = JSON.parse(method) rescue method

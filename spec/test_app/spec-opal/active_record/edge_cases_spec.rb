@@ -3,7 +3,8 @@ require 'spec_helper'
 #require 'todo_item'
 
 describe "pending edge cases" do
-  it "base and subclass both belong to same parent record" 
+  it "base and subclass both belong to same parent record"
+  it "will set changed on the parent record when updating a child aggregate"
 end
 
 use_case "server loading edge cases" do

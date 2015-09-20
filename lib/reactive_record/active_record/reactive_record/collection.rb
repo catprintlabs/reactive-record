@@ -1,7 +1,7 @@
 module ReactiveRecord
 
   class Collection
-    
+
     def initialize(target_klass, owner = nil, association = nil, *vector)
       @owner = owner  # can be nil if this is an outer most scope
       @association = association
@@ -13,7 +13,7 @@ module ReactiveRecord
       end
       @scopes = {}
     end
-    
+
     def dup_for_sync
       self.dup.instance_eval do
         @collection = @collection.dup if @collection
@@ -43,20 +43,23 @@ module ReactiveRecord
     def ==(other_collection)
       my_collection = (@collection || []).select { |target| target != @dummy_record }
       other_collection = (other_collection ? (other_collection.collection || []) : []).select { |target| target != other_collection.dummy_record }
+
+      puts "comparing collections [#{my_collection}] == [#{other_collection}]"
       my_collection == other_collection
     end
 
     def apply_scope(scope, *args)
       # The value returned is another ReactiveRecordCollection with the scope added to the vector
       # no additional action is taken
+      puts "#{self}.apply_scope(#{scope}, #{args})"
       scope = [scope, *args] if args.count > 0
       @scopes[scope] ||= Collection.new(@target_klass, @owner, @association, *@vector, [scope])
     end
-    
+
     def proxy_association
       @association || self # returning self allows this to work with things like Model.all
     end
-    
+
     def klass
       @target_klass
     end
@@ -64,17 +67,24 @@ module ReactiveRecord
 
     def <<(item)
       backing_record = item.instance_variable_get(:@backing_record)
-      if backing_record and @owner and @association and inverse_of = @association.inverse_of
-        item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
-        item.attributes[inverse_of] = @owner
-        React::State.set_state(backing_record, inverse_of, @owner) unless backing_record.data_loading?
-      end
+      # if backing_record and @owner and @association and inverse_of = @association.inverse_of
+      #   item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
+      #   item.attributes[inverse_of] = @owner
+      #   React::State.set_state(backing_record, inverse_of, @owner) unless backing_record.data_loading?
+      # end
+      #all << item unless all.include? item
       all << item unless all.include? item
+      if backing_record and @owner and @association and inverse_of = @association.inverse_of and item.attributes[inverse_of] != @owner
+        current_association = item.attributes[inverse_of]
+        backing_record.update_attribute(inverse_of, @owner)
+        current_association.attributes[@association.attribute].delete(item) if current_association and current_association.attributes[@association.attribute]
+        @owner.instance_variable_get(:@backing_record).update_attribute(@association.attribute) # forces a check if association contents have changed from synced values
+      end
       @collection.delete(@dummy_record)
       @dummy_record = @dummy_collection = nil
       self
     end
-    
+
     [:first, :last].each do |method|
       define_method method do |*args|
         if args.count == 0
@@ -84,7 +94,7 @@ module ReactiveRecord
         end
       end
     end
-    
+
     def replace(new_array)
       #return new_array if @collection == new_array  #not sure we need this anymore
       @dummy_collection.notify if @dummy_collection
@@ -102,12 +112,16 @@ module ReactiveRecord
     end
 
     def delete(item)
+      puts "deleting #{item} from #{self} current contents is [#{all}]"
       if @owner and @association and inverse_of = @association.inverse_of
-        item.attributes[inverse_of] = nil
-        backing_record = item.instance_variable_get(:@backing_record)
-        React::State.set_state(backing_record, inverse_of, nil) unless backing_record.data_loading?
-      end
-      all.delete(item)
+        if backing_record = item.instance_variable_get(:@backing_record) and backing_record.attributes[inverse_of] == @owner
+          # the if prevents double update if delete is being called from << (see << above)
+          backing_record.update_attribute(inverse_of, nil)
+        end
+        all.delete(item).tap { @owner.instance_variable_get(:@backing_record).update_attribute(@association.attribute) } # forces a check if association contents have changed from synced values
+      else
+        all.delete(item)
+      end.tap { puts "deleted #{item} from #{self} new contents is [#{all}]" }
     end
 
     def method_missing(method, *args, &block)
@@ -119,17 +133,17 @@ module ReactiveRecord
         super
       end
     end
-    
+
     protected
-    
+
     def dummy_record
       @dummy_record
     end
-    
+
     def collection
       @collection
     end
-    
+
     def dummy_collection
       @dummy_collection
     end

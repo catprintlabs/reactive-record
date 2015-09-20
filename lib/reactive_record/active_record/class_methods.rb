@@ -90,6 +90,10 @@ module ActiveRecord
       Aggregations::AggregationReflection.new(base_class, :composed_of, name, opts)
     end
 
+    def column_names
+      []  # it would be great to figure out how to get this information on the client!  For now we just return an empty array
+    end
+
     [
       "table_name=", "before_validation", "with_options", "validates_presence_of", "validates_format_of",
       "accepts_nested_attributes_for", "before_create", "after_create", "before_save", "after_save", "before_destroy", "where", "validate",

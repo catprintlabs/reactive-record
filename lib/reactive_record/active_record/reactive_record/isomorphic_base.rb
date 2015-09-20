@@ -188,7 +188,7 @@ module ReactiveRecord
 
     if RUBY_ENGINE == 'opal'
 
-      def save(&block)
+      def save(validate, &block)
 
         if data_loading?
 
@@ -208,13 +208,11 @@ module ReactiveRecord
           backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record
 
           add_new_association = lambda do |record, attribute, assoc_record|
-            if assoc_record.changed?
-              unless backing_records[assoc_record.object_id]
-                records_to_process << assoc_record
-                backing_records[assoc_record.object_id] = assoc_record
-              end
-              associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
+            unless backing_records[assoc_record.object_id]
+              records_to_process << assoc_record
+              backing_records[assoc_record.object_id] = assoc_record
             end
+            associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
           end
 
           record_index = 0
@@ -236,7 +234,7 @@ module ReactiveRecord
               elsif record.changed?(attribute)
                 output_attributes[attribute] = value
               end
-            end
+            end if record.changed?
             record_index += 1
           end
 
@@ -244,16 +242,17 @@ module ReactiveRecord
 
           promise = Promise.new
 
-          HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations}).then do |response|
+          HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations, validate: validate}).then do |response|
             begin
               response.json[:models] = response.json[:saved_models].collect do |item|
                 backing_records[item[0]].ar_instance
               end
 
+              response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] if item[3] }
+
               if response.json[:success]
                 response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
               else
-                response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] }
                 log("Reactive Record Save Failed: #{response.json[:message]}", :error)
                 response.json[:saved_models].each do | item |
                   log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
@@ -279,7 +278,7 @@ module ReactiveRecord
 
     else
 
-      def self.save_records(models, associations, acting_user)
+      def self.save_records(models, associations, acting_user, validate)
 
         reactive_records = {}
         new_models = []
@@ -288,14 +287,16 @@ module ReactiveRecord
         models.each do |model_to_save|
           attributes = model_to_save[:attributes]
           model = Object.const_get(model_to_save[:model])
-          id = attributes[model.primary_key] # if we are saving existing model primary key value will be present
+          id = attributes.delete(model.primary_key) # if we are saving existing model primary key value will be present
           reactive_records[model_to_save[:id]] = if id
             record = model.find(id)
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
+                puts "record #{id} setting #{record}['#{key}'] = #{value}"
                 record[key] = value
               else
+                puts "record #{id} record #{record}.send('#{key}=',  #{value})"
                 record.send("#{key}=",value)
               end
             end
@@ -305,8 +306,10 @@ module ReactiveRecord
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
+                puts "new record setting #{record}['#{key}'] = #{value}"
                 record[key] = value
               else
+                puts "new record #{record}.send('#{key}=',  #{value})"
                 record.send("#{key}=",value)
               end
             end
@@ -315,27 +318,48 @@ module ReactiveRecord
           end
         end
 
+        puts "!!!!!!!!!!!!!!attributes updated"
+
         ActiveRecord::Base.transaction do
 
           associations.each do |association|
             parent = reactive_records[association[:parent_id]]
             parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
             if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
+              puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
               parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+              puts "updated  is frozen? #{reactive_records[association[:child_id]].frozen?}"
             elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
-              parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
+              puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
+              #parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
+              puts "Skipped (should be done by belongs to)"
             else
+              puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
               parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+              puts "updated"
             end
           end if associations
+
+          puts "!!!!!!!!!!!!associations updated"
 
           has_errors = false
 
           saved_models = reactive_records.collect do |reactive_record_id, model|
-            unless model.frozen?
-              saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save
+            puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
+            if model.frozen?
+              puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+              valid = model.valid?
+              puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
+              has_errors ||= (validate and !valid)
+              puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
+              [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
+            elsif !model.id or model.changed?
+              puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+              saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
               has_errors ||= !saved
-              [reactive_record_id, model.class.name, model.attributes, (saved ? nil : model.errors.messages)]
+              messages = model.errors.messages if (validate and !saved) or (!validate and !model.valid?)
+              puts "saved complete errors = <#{!saved}>, #{messages} has_errors #{has_errors}"
+              [reactive_record_id, model.class.name, model.attributes, messages]
             end
           end.compact
 
@@ -346,6 +370,7 @@ module ReactiveRecord
         {success: true, saved_models: saved_models }
 
       rescue Exception => e
+        puts "exception #{e}"
 
         {success: false, saved_models: saved_models, message: e.message}
 
