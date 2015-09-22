@@ -334,7 +334,7 @@ module ReactiveRecord
               puts "current parent attributes = #{current_attributes}"
               new_attributes = aggregate.attributes
               puts "current child attributes = #{new_attributes}"
-              merged_attributes = current_attributes.merge(new_attributes) { |k, n, o| n or o }
+              merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
               puts "merged attributes = #{merged_attributes}"
               aggregate.assign_attributes(merged_attributes)
               puts "aggregate attributes after merge = #{aggregate.attributes}"

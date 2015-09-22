@@ -100,9 +100,17 @@ module ReactiveRecord
         record = new model
         record.vector = vector
       end
-      record.aggregate_owner = aggregate_owner
-      record.aggregate_attribute = vector.last
+
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
+
+      if aggregate_owner
+        record.aggregate_owner = aggregate_owner
+        record.aggregate_attribute = vector.last
+        aggregate_owner.attributes[vector.last] = record.ar_instance
+      end
+
+      record.ar_instance
+
     end
 
     def initialize(model, hash = {}, ar_instance = nil)
@@ -180,11 +188,23 @@ module ReactiveRecord
               attributes[attribute].attributes[inverse_of] = nil
             end
           end
-        elsif @model.reflect_on_aggregation(attribute)
-          attributes[attribute].instance_variable_get(:@backing_record).aggregate_owner = nil if attributes[attribute]
-          aggregate = value.instance_variable_get(:@backing_record)
-          aggregate.aggregate_owner = self
-          aggregate.aggregate_attribute = attribute
+        elsif aggregation = @model.reflect_on_aggregation(attribute)
+
+          unless attributes[attribute]
+            raise "unitialized aggregate attribute - should never happen"
+          end
+
+          aggregate_record = attributes[attribute].instance_variable_get(:@backing_record)
+
+          if value
+            value_attributes = value.instance_variable_get(:@backing_record).attributes
+            aggregation.mapped_attributes.each { |mapped_attribute| aggregate_record.update_attribute(mapped_attribute, value_attributes[mapped_attribute])}
+          else
+            aggregation.mapped_attributes.each { |mapped_attribute| aggregate_record.update_attribute(mapped_attribute, nil) }
+          end
+
+          return attributes[attribute]
+
         end
         update_attribute(attribute, value)
       end

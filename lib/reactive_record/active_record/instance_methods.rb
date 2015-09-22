@@ -17,7 +17,7 @@ module ActiveRecord
           self.class.load_data do
             hash.each do |attribute, value|
               unless attribute == primary_key
-                reactive_set!(attribute, value) unless attribute == primary_key
+                reactive_set!(attribute, value)
                 changed_attributes << attribute
               end
             end
@@ -50,6 +50,10 @@ module ActiveRecord
 
     def changed?
       @backing_record.changed?
+    end
+
+    def dup
+      self.class.new(self.attributes)
     end
 
     def ==(ar_instance)
