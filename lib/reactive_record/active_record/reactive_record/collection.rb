@@ -43,15 +43,12 @@ module ReactiveRecord
     def ==(other_collection)
       my_collection = (@collection || []).select { |target| target != @dummy_record }
       other_collection = (other_collection ? (other_collection.collection || []) : []).select { |target| target != other_collection.dummy_record }
-
-      puts "comparing collections [#{my_collection}] == [#{other_collection}]"
       my_collection == other_collection
     end
 
     def apply_scope(scope, *args)
       # The value returned is another ReactiveRecordCollection with the scope added to the vector
       # no additional action is taken
-      puts "#{self}.apply_scope(#{scope}, #{args})"
       scope = [scope, *args] if args.count > 0
       @scopes[scope] ||= Collection.new(@target_klass, @owner, @association, *@vector, [scope])
     end
@@ -112,7 +109,6 @@ module ReactiveRecord
     end
 
     def delete(item)
-      puts "deleting #{item} from #{self} current contents is [#{all}]"
       if @owner and @association and inverse_of = @association.inverse_of
         if backing_record = item.instance_variable_get(:@backing_record) and backing_record.attributes[inverse_of] == @owner
           # the if prevents double update if delete is being called from << (see << above)
@@ -121,13 +117,13 @@ module ReactiveRecord
         all.delete(item).tap { @owner.instance_variable_get(:@backing_record).update_attribute(@association.attribute) } # forces a check if association contents have changed from synced values
       else
         all.delete(item)
-      end.tap { puts "deleted #{item} from #{self} new contents is [#{all}]" }
+      end
     end
 
     def method_missing(method, *args, &block)
       if [].respond_to? method
         all.send(method, *args, &block)
-      elsif @target_klass.respond_to? method
+      elsif @target_klass.respond_to?(method) or (args.count == 1 && method =~ /^find_by_/)
         apply_scope(method, *args)
       else
         super

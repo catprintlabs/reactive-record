@@ -192,7 +192,6 @@ module ReactiveRecord
     end
 
     def update_attribute(attribute, *args)
-      puts "update_attribute(#{attribute}, #{args})"
       value = args[0]
       changed = if args.count == 0
         if association = @model.reflect_on_association(attribute) and association.collection?
@@ -212,18 +211,16 @@ module ReactiveRecord
         changed_attributes << attribute
       end
       attributes[attribute] = value if args.count != 0
-      unless data_loading?
-        React::State.set_state(self, attribute, value)
-        if empty_before != changed_attributes.empty?
-          React::State.set_state(self, self, :changed)
-          aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
-        end
+      React::State.set_state(self, attribute, value) unless data_loading?
+      if empty_before != changed_attributes.empty?
+        React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?) unless data_loading?
+        aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
       end
     end
 
     def changed?(*args)
       if args.count == 0
-        React::State.get_state(self, self)
+        React::State.get_state(self, "!CHANGED!")
         !changed_attributes.empty?
       else
         React::State.get_state(self, args[0])
@@ -238,10 +235,18 @@ module ReactiveRecord
     def sync!(hash = {})  # does NOT notify (see saved! for notification)
       @attributes.merge! hash
       @synced_attributes = @attributes.dup
-      @synced_attributes.each { |key, value| @synced_attributes[key] = value.dup_for_sync if value.is_a? Collection }
+      @synced_attributes.each do |key, value|
+        if value.is_a? Collection
+          @synced_attributes[key] = value.dup_for_sync
+        elsif aggregation = model.reflect_on_aggregation(key)
+          value.instance_variable_get(:@backing_record).sync!
+        end
+      end
       @changed_attributes = []
       @saving = false
       @errors = nil
+      # set the vector - this only happens when a new record is saved
+      @vector = [@model, ["find_by_#{@model.primary_key}", id]] if (!vector or vector.empty?) and id and id != ""
       self
     end
 
@@ -254,7 +259,6 @@ module ReactiveRecord
 
     def revert
       @attributes.each do |attribute, value|
-        puts "reverting #{attribute} from #{value} to #{@synced_attributes[attribute]}"
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
       end
       @attributes.delete_if { |attribute, value| !@synced_attributes.has_key?(attribute) }
@@ -267,13 +271,16 @@ module ReactiveRecord
       @saving = true
     end
 
-    def saved!(errors = nil)  # sets saving to false AND notifies
+    def errors!(errors)
+      @errors = errors and ActiveModel::Error.new(errors)
+    end
+
+    def saved!  # sets saving to false AND notifies
       @saving = false
-      @errors = ActiveModel::Error.new(errors)
-      if errors
-        React::State.set_state(self, self, :errors)
-      elsif !data_loading?
+      if !@errors or @errors.empty?
         React::State.set_state(self, self, :saved)
+      elsif !data_loading?
+        React::State.set_state(self, self, :error)
       end
       self
     end
@@ -331,7 +338,11 @@ module ReactiveRecord
       elsif association = @model.reflect_on_association(method) and association.collection?
         @attributes[method] = Collection.new(association.klass, @ar_instance, association)
       elsif aggregation = @model.reflect_on_aggregation(method)
-        @attributes[method] = aggregation.klass.new
+        @attributes[method] = aggregation.klass.new.tap do |aggregate|
+          backing_record = aggregate.instance_variable_get(:@backing_record)
+          backing_record.aggregate_owner = self
+          backing_record.aggregate_attribute = method
+        end
       end
     end
 

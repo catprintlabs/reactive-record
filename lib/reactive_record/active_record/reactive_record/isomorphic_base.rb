@@ -35,7 +35,12 @@ module ReactiveRecord
 
     isomorphic_method(:fetch_from_db) do |f, vector|
       # vector must end with either "*all", or be a simple attribute
-      f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
+      begin
+        f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
+      rescue Exception => e
+        `debugger`
+        nil
+      end
       f.when_on_server { @server_data_cache[*vector] }
     end
 
@@ -248,8 +253,6 @@ module ReactiveRecord
                 backing_records[item[0]].ar_instance
               end
 
-              response.json[:saved_models].each { | item | backing_records[item[0]].saved! item[3] if item[3] }
-
               if response.json[:success]
                 response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
               else
@@ -259,10 +262,13 @@ module ReactiveRecord
                 end
               end
 
+              response.json[:saved_models].each { | item | backing_records[item[0]].errors! item[3] }
+
               yield response.json[:success], response.json[:message], response.json[:models]  if block
               promise.resolve response.json
 
-              backing_records.each { |id, record| record.saved! } if response.json[:success]
+              backing_records.each { |id, record| record.saved! }
+
             rescue Exception => e
               puts "Save Failed: #{e}"
             end
@@ -293,10 +299,8 @@ module ReactiveRecord
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
-                puts "record #{id} setting #{record}['#{key}'] = #{value}"
                 record[key] = value
               else
-                puts "record #{id} record #{record}.send('#{key}=',  #{value})"
                 record.send("#{key}=",value)
               end
             end
@@ -306,10 +310,8 @@ module ReactiveRecord
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
-                puts "new record setting #{record}['#{key}'] = #{value}"
                 record[key] = value
               else
-                puts "new record #{record}.send('#{key}=',  #{value})"
                 record.send("#{key}=",value)
               end
             end
@@ -327,8 +329,17 @@ module ReactiveRecord
             parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
             if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
               puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
-              puts "updated  is frozen? #{reactive_records[association[:child_id]].frozen?}"
+              aggregate = reactive_records[association[:child_id]]
+              current_attributes = parent.send(association[:attribute]).attributes
+              puts "current parent attributes = #{current_attributes}"
+              new_attributes = aggregate.attributes
+              puts "current child attributes = #{new_attributes}"
+              merged_attributes = current_attributes.merge(new_attributes) { |k, n, o| n or o }
+              puts "merged attributes = #{merged_attributes}"
+              aggregate.assign_attributes(merged_attributes)
+              puts "aggregate attributes after merge = #{aggregate.attributes}"
+              parent.send("#{association[:attribute]}=", aggregate)
+              puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
             elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
               puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
               #parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
