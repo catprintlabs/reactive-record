@@ -237,6 +237,12 @@ module ReactiveRecord
 
       def self.load_from_json(tree, target = nil)
         ignore_all = nil
+
+        # have to process *all before any other items
+        if sorted_collection = tree.delete("*all")
+          target.replace sorted_collection.collect { |id| target.proxy_association.klass.find(id) }
+        end
+
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil

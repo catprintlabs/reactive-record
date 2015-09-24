@@ -382,6 +382,7 @@ module ReactiveRecord
 
       rescue Exception => e
         puts "exception #{e}"
+        puts e.backtrace.join("\n")
 
         {success: false, saved_models: saved_models, message: e.message}
 

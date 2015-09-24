@@ -74,7 +74,7 @@ module ActiveRecord
     end
 
     def save(opts = {}, &block)
-      @backing_record.save(opts[:validate], &block)
+      @backing_record.save(opts.has_key?(:validate) ? opts[:validate] : true, &block)
     end
 
     def saving?
