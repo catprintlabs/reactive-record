@@ -8,8 +8,12 @@ module ReactiveRecord
       @target_klass = target_klass
       if owner and !owner.id and vector.length <= 1
         @collection = []
+      elsif vector.length > 0
+        @vector = vector
+      elsif owner
+        @vector = owner.instance_variable_get(:@backing_record).vector + [association.attribute]
       else
-        @vector = vector.count == 0 ? [target_klass] : vector
+        @vector = [target_klass]
       end
       @scopes = {}
     end

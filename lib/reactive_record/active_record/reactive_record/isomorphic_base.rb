@@ -35,12 +35,7 @@ module ReactiveRecord
 
     isomorphic_method(:fetch_from_db) do |f, vector|
       # vector must end with either "*all", or be a simple attribute
-      begin
-        f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
-      rescue Exception => e
-        `debugger`
-        nil
-      end
+      f.send_to_server [vector.shift.name, *vector] if  RUBY_ENGINE == 'opal'
       f.when_on_server { @server_data_cache[*vector] }
     end
 

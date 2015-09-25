@@ -292,6 +292,7 @@ module ReactiveRecord
     end
 
     def errors!(errors)
+      @saving = false
       @errors = errors and ActiveModel::Error.new(errors)
     end
 

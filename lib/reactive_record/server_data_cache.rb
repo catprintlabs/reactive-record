@@ -99,7 +99,7 @@ module ReactiveRecord
           root = CacheItem.new(@cache, @acting_user, vector[0])
           vector[1..-1].inject(root) { |cache_item, method| cache_item.apply_method method if cache_item }
           vector[0] = vector[0].constantize
-          new_items = @cache.select { | cache_item | cache_item.root == root}
+          new_items = @cache.select { | cache_item | cache_item.root == root }
           @requested_cache_items += new_items
           new_items.last.value if new_items.last
         end
@@ -208,7 +208,11 @@ module ReactiveRecord
             end
           end
 
-          def as_hash(children = [@ar_object])
+          def as_hash(children = nil)
+            unless children
+              return {} if @ar_object.is_a?(Class) and (@ar_object < ActiveRecord::Base)
+              children = [@ar_object]
+            end
             if @parent
               if method == "*"
                 if @ar_object.is_a? Array  # this happens when a scope is empty there is test case, but
