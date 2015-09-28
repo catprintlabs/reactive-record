@@ -16,5 +16,8 @@ class User < ActiveRecord::Base
     "#{first_name} #{last_name}"
   end
 
+  def expensive_math(n)
+    n+id.to_i
+  end unless RUBY_ENGINE == 'opal'
 
 end

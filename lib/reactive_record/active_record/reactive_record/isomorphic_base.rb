@@ -90,8 +90,8 @@ module ReactiveRecord
 
       def notify
         unless ReactiveRecord::Base.data_loading?
-          ReactiveRecord.loads_pending!
-          ReactiveRecord::WhileLoading.loading!
+          ReactiveRecord.loads_pending!           #loads
+          ReactiveRecord::WhileLoading.loading!   #loads
         end
       end
 
@@ -151,7 +151,9 @@ module ReactiveRecord
 
 
     def self.schedule_fetch
-      @fetch_scheduled ||= after(0.001) do
+      #ReactiveRecord.loads_pending!
+      #ReactiveRecord::WhileLoading.loading!
+      @fetch_scheduled ||= after(0.0) do
         if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches
           last_fetch_at = @last_fetch_at
           pending_fetches = @pending_fetches.uniq

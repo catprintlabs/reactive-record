@@ -177,7 +177,8 @@ module ReactiveRecord
                     @root = cache_item.root
                     self
                   end
-                rescue
+                rescue Exception => e
+                  raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
                   representative
                 end
               else
@@ -258,7 +259,11 @@ module ReactiveRecord
             ignore_all = true
             target << (new_target = target.proxy_association.klass.find(method))
           elsif method.is_a? Array
-            new_target = target.send *method unless value.is_a? Array # value is an array if scope returns nil
+            if !(target.class < ActiveRecord::Base)
+              new_target = target.send *method unless value.is_a? Array # value is an array if scope returns nil
+            else
+              target.attributes[[method]] = value.first
+            end
           elsif value.is_a? Array
             target.send "#{method}=", value.first
           elsif value.is_a? Hash and value[:id] and value[:id].first #and

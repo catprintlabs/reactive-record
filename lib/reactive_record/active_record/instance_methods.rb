@@ -68,6 +68,8 @@ module ActiveRecord
         @backing_record.reactive_set!(attribute_name, args[0])
       elsif args.count == 0 && !block
         @backing_record.reactive_get!(name)
+      elsif !block
+        @backing_record.reactive_get!([[name]+args])
       else
         super
       end
