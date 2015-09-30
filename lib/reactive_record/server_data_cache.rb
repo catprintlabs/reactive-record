@@ -209,6 +209,13 @@ module ReactiveRecord
             end
           end
 
+          def jsonize(method)
+            # sadly standard json converts {[:foo, nil] => 123} to {"['foo', nil]": 123}
+            # luckily [:foo, nil] does convert correctly
+            # so we check the methods and force proper conversion
+            method.is_a?(Array) ? method.to_json : method
+          end
+
           def as_hash(children = nil)
             unless children
               return {} if @ar_object.is_a?(Class) and (@ar_object < ActiveRecord::Base)
@@ -222,14 +229,14 @@ module ReactiveRecord
                   @parent.as_hash({@ar_object.id => children})
                 end
               elsif @ar_object.class < ActiveRecord::Base and children.is_a? Hash
-                @parent.as_hash({method => children.merge({
+                @parent.as_hash({jsonize(method) => children.merge({
                   :id => [@ar_object.id],
                   @ar_object.class.inheritance_column => [@ar_object[@ar_object.class.inheritance_column]],
                   })})
               elsif method == "*all"
-                @parent.as_hash({method => children.first})
+                @parent.as_hash({jsonize(method) => children.first})
               else
-                @parent.as_hash({method => children})
+                @parent.as_hash({jsonize(method) => children})
               end
             else
               {method.name => children}
@@ -265,12 +272,15 @@ module ReactiveRecord
               target.attributes[[method]] = value.first
             end
           elsif value.is_a? Array
-            target.send "#{method}=", value.first
+            #target.send "#{method}=", value.first
+            target.backing_record.reactive_set!(method, value.first)
           elsif value.is_a? Hash and value[:id] and value[:id].first #and
             association = target.class.reflect_on_association(method)
             new_target = association.klass.find(value[:id].first)
-            target.send "#{method}=", new_target
+            #target.send "#{method}=", new_target
+            target.backing_record.reactive_set!(method, new_target)
           else
+            # target might be able to respond to method directly so we can't optimize out the target send
             new_target = target.send("#{method}=", target.send(method))
           end
           load_from_json(value, new_target) if new_target

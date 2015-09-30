@@ -98,12 +98,27 @@ module ReactiveRecord
         def loading!
           React::RenderingContext.waiting_on_resources = true
           React::State.get_state(self, :loaded_at)
+          React::State.set_state(self, :quiet, false)
           @is_loading = true
         end
 
         def loaded_at(loaded_at)
           React::State.set_state(self, :loaded_at, loaded_at)
           @is_loading = false
+        end
+
+        def quiet?
+          React::State.get_state(self, :quiet)
+        end
+
+        def page_loaded?
+          React::State.get_state(self, :page_loaded)
+        end
+
+        def quiet!
+          React::State.set_state(self, :quiet, true)
+          after(1) { React::State.set_state(self, :page_loaded, true) } unless on_opal_server? or @page_loaded
+          @page_loaded = true
         end
 
         def add_style_sheet

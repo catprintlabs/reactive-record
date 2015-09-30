@@ -2,6 +2,8 @@ module ActiveRecord
 
   module InstanceMethods
 
+    attr_reader :backing_record
+
     def attributes
       @backing_record.attributes
     end
@@ -76,7 +78,7 @@ module ActiveRecord
     end
 
     def save(opts = {}, &block)
-      @backing_record.save(opts.has_key?(:validate) ? opts[:validate] : true, &block)
+      @backing_record.save(opts.has_key?(:validate) ? opts[:validate] : true, opts[:force], &block)
     end
 
     def saving?

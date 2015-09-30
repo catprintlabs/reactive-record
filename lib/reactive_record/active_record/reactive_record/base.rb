@@ -49,6 +49,7 @@ module ReactiveRecord
     def self.load_data(&block)
       current_data_loading, @data_loading = [@data_loading, true]
       yield
+    ensure
       @data_loading = current_data_loading
     end
 
@@ -143,7 +144,7 @@ module ReactiveRecord
       if !(value and existing_record = records[@model].detect { |record| record.attributes[primary_key] == value})
         attributes[primary_key] = value
       else
-        @ar_instance.instance_eval { @backing_record = existing_record }
+        @ar_instance.instance_variable_set(:@backing_record, existing_record)
         existing_record.attributes.merge!(attributes) { |key, v1, v2| v1 }
       end
     end
@@ -183,7 +184,7 @@ module ReactiveRecord
             elsif value
               attributes[attribute].attributes[inverse_of] = nil if attributes[attribute]
               value.attributes[inverse_of] = @ar_instance
-              React::State.set_state(value.instance_variable_get(:@backing_record), inverse_of, @ar_instance) unless data_loading?
+              React::State.set_state(value.backing_record, inverse_of, @ar_instance) unless data_loading?
             elsif attributes[attribute]
               attributes[attribute].attributes[inverse_of] = nil
             end
@@ -194,10 +195,10 @@ module ReactiveRecord
             raise "unitialized aggregate attribute - should never happen"
           end
 
-          aggregate_record = attributes[attribute].instance_variable_get(:@backing_record)
+          aggregate_record = attributes[attribute].backing_record
 
           if value
-            value_attributes = value.instance_variable_get(:@backing_record).attributes
+            value_attributes = value.backing_record.attributes
             aggregation.mapped_attributes.each { |mapped_attribute| aggregate_record.update_attribute(mapped_attribute, value_attributes[mapped_attribute])}
           else
             aggregation.mapped_attributes.each { |mapped_attribute| aggregate_record.update_attribute(mapped_attribute, nil) }
@@ -217,7 +218,7 @@ module ReactiveRecord
         if association = @model.reflect_on_association(attribute) and association.collection?
           attributes[attribute] != @synced_attributes[attribute]
         else
-          !attributes[attribute].instance_variable_get(:@backing_record).changed_attributes.empty?
+          !attributes[attribute].backing_record.changed_attributes.empty?
         end
       elsif association = @model.reflect_on_association(attribute) and association.collection?
         value != @synced_attributes[attribute]
@@ -259,7 +260,9 @@ module ReactiveRecord
         if value.is_a? Collection
           @synced_attributes[key] = value.dup_for_sync
         elsif aggregation = model.reflect_on_aggregation(key)
-          value.instance_variable_get(:@backing_record).sync!
+          value.backing_record.sync!
+        else
+          @synced_attributes[key] = JSON.parse(value.to_json)
         end
       end
       @changed_attributes = []
@@ -322,7 +325,7 @@ module ReactiveRecord
       else
         new_from_vector(association.klass, nil, *vector, association.attribute)
       end
-      instance_backing_record_attributes = instance.instance_variable_get(:@backing_record).attributes
+      instance_backing_record_attributes = instance.backing_record.attributes
       inverse_association = association.klass.reflect_on_association(inverse_of)
       if inverse_association.collection?
         instance_backing_record_attributes[inverse_of] = if id and id != ""
@@ -360,7 +363,7 @@ module ReactiveRecord
         @attributes[method] = Collection.new(association.klass, @ar_instance, association)
       elsif aggregation = @model.reflect_on_aggregation(method)
         @attributes[method] = aggregation.klass.new.tap do |aggregate|
-          backing_record = aggregate.instance_variable_get(:@backing_record)
+          backing_record = aggregate.backing_record
           backing_record.aggregate_owner = self
           backing_record.aggregate_attribute = method
         end

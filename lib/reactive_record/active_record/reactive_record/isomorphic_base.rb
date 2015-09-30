@@ -140,6 +140,7 @@ module ReactiveRecord
       end
 
       def to_date
+        notify
         "2001-01-01T00:00:00.000-00:00".to_date
       end
 
@@ -153,7 +154,7 @@ module ReactiveRecord
     def self.schedule_fetch
       #ReactiveRecord.loads_pending!
       #ReactiveRecord::WhileLoading.loading!
-      @fetch_scheduled ||= after(0.0) do
+      @fetch_scheduled ||= after(0.01) do
         if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches
           last_fetch_at = @last_fetch_at
           pending_fetches = @pending_fetches.uniq
@@ -171,6 +172,7 @@ module ReactiveRecord
             log(["       Returned: %o", response.json.to_n])
             ReactiveRecord.run_blocks_to_load
             ReactiveRecord::WhileLoading.loaded_at last_fetch_at
+            ReactiveRecord::WhileLoading.quiet! if @pending_fetches.empty?
           end.fail do |response|
             log("Fetch failed", :error)
             ReactiveRecord.run_blocks_to_load(response.body)
@@ -190,13 +192,13 @@ module ReactiveRecord
 
     if RUBY_ENGINE == 'opal'
 
-      def save(validate, &block)
+      def save(validate, force, &block)
 
         if data_loading?
 
           sync!
 
-        elsif changed?
+        elsif force or changed?
 
           # we want to pass not just the model data to save, but also enough information so that on return from the server
           # we can update the models on the client
@@ -225,18 +227,18 @@ module ReactiveRecord
             record.attributes.each do |attribute, value|
               if association = record.model.reflect_on_association(attribute)
                 if association.collection?
-                  value.each { |assoc| add_new_association.call record, attribute, assoc.instance_variable_get(:@backing_record) }
+                  value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
                 elsif value
-                  add_new_association.call record, attribute, value.instance_variable_get(:@backing_record)
+                  add_new_association.call record, attribute, value.backing_record
                 else
                   output_attributes[attribute] = nil
                 end
               elsif record.model.reflect_on_aggregation(attribute)
-                add_new_association.call record, attribute, value.instance_variable_get(:@backing_record)
+                add_new_association.call record, attribute, value.backing_record
               elsif record.changed?(attribute)
                 output_attributes[attribute] = value
               end
-            end if record.changed?
+            end if record.changed? || (record == self && force)
             record_index += 1
           end
 

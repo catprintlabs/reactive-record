@@ -11,7 +11,7 @@ module ReactiveRecord
       elsif vector.length > 0
         @vector = vector
       elsif owner
-        @vector = owner.instance_variable_get(:@backing_record).vector + [association.attribute]
+        @vector = owner.backing_record.vector + [association.attribute]
       else
         @vector = [target_klass]
       end
@@ -37,7 +37,7 @@ module ReactiveRecord
         else
           @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
           @dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
-          @dummy_record.instance_variable_get(:@backing_record).attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
+          @dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
           @collection << @dummy_record
         end
       end
@@ -67,7 +67,7 @@ module ReactiveRecord
 
 
     def <<(item)
-      backing_record = item.instance_variable_get(:@backing_record)
+      backing_record = item.backing_record
       # if backing_record and @owner and @association and inverse_of = @association.inverse_of
       #   item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
       #   item.attributes[inverse_of] = @owner
@@ -79,7 +79,7 @@ module ReactiveRecord
         current_association = item.attributes[inverse_of]
         backing_record.update_attribute(inverse_of, @owner)
         current_association.attributes[@association.attribute].delete(item) if current_association and current_association.attributes[@association.attribute]
-        @owner.instance_variable_get(:@backing_record).update_attribute(@association.attribute) # forces a check if association contents have changed from synced values
+        @owner.backing_record.update_attribute(@association.attribute) # forces a check if association contents have changed from synced values
       end
       @collection.delete(@dummy_record)
       @dummy_record = @dummy_collection = nil
@@ -114,11 +114,11 @@ module ReactiveRecord
 
     def delete(item)
       if @owner and @association and inverse_of = @association.inverse_of
-        if backing_record = item.instance_variable_get(:@backing_record) and backing_record.attributes[inverse_of] == @owner
+        if backing_record = item.backing_record and backing_record.attributes[inverse_of] == @owner
           # the if prevents double update if delete is being called from << (see << above)
           backing_record.update_attribute(inverse_of, nil)
         end
-        all.delete(item).tap { @owner.instance_variable_get(:@backing_record).update_attribute(@association.attribute) } # forces a check if association contents have changed from synced values
+        all.delete(item).tap { @owner.backing_record.update_attribute(@association.attribute) } # forces a check if association contents have changed from synced values
       else
         all.delete(item)
       end

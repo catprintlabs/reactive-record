@@ -62,8 +62,9 @@ module ActiveRecord
     end
 
     def scope(name, body)
-      singleton_class.send(:define_method, name) do
-        ReactiveRecord::Base.class_scopes(self)[name] ||= ReactiveRecord::Collection.new(self, nil, nil, self, name)
+      singleton_class.send(:define_method, name) do | *args |
+        args = args.count == 0 ? name : [name, *args]
+        ReactiveRecord::Base.class_scopes(self)[name] ||= ReactiveRecord::Collection.new(self, nil, nil, self, args)
       end
       singleton_class.send(:define_method, "#{name}=") do |collection|
         ReactiveRecord::Base.class_scopes(self)[name] = collection
@@ -106,7 +107,6 @@ module ActiveRecord
     def _react_param_conversion(param, opt = nil)
       # defines how react will convert incoming json to this ActiveRecord model
       times = {start: Time.now.to_f, json_start: 0, json_end: 0, db_load_start: 0, db_load_end: 0}
-      puts "loading a #{self}"
       param_is_native = !param.respond_to?(:is_a?) rescue true
       times[:json_start] = Time.now.to_f
       param = JSON.from_object param if param_is_native
@@ -132,7 +132,7 @@ module ActiveRecord
         nil
       end
       times[:end] = Time.now.to_f
-      puts "times - total: #{'%.04f' % (times[:end]-times[:start])}, native conversion: #{'%.04f' % (times[:json_end]-times[:json_start])}, loading: #{'%.04f' % (times[:db_load_end]-times[:db_load_start])}"
+      #puts "times - total: #{'%.04f' % (times[:end]-times[:start])}, native conversion: #{'%.04f' % (times[:json_end]-times[:json_start])}, loading: #{'%.04f' % (times[:db_load_end]-times[:db_load_start])}"
       result
     end
 
