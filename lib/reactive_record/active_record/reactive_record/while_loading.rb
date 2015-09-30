@@ -18,7 +18,7 @@ module ReactiveRecord
     @loads_pending = @load_stack.pop
     promise
   rescue Exception => e
-    log "ReactiveRecord.load exception raised during retry: #{e}", :error
+    React::IsomorphicHelpers.log "ReactiveRecord.load exception raised during initial load: #{e}", :error
   end
 
   def self.loads_pending!
@@ -43,7 +43,7 @@ module ReactiveRecord
       end
     end
   rescue Exception => e
-    log "ReactiveRecord.load exception raised during retry: #{e}", :error
+    React::IsomorphicHelpers.log "ReactiveRecord.load exception raised during retry: #{e}", :error
   end
 
 
