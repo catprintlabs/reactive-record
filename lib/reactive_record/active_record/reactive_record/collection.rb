@@ -36,12 +36,21 @@ module ReactiveRecord
           end
         else
           @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
-          @dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*")
-          @dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
-          @collection << @dummy_record
+          @dummy_record = self[0]
         end
       end
       @collection
+    end
+
+    def [](index)
+      if @dummy_collection and index >= @collection.length
+        (@collection.length..index).each do |i|
+          new_dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*#{i}")
+          new_dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
+          @collection << new_dummy_record
+        end
+      end
+      @collection[index]
     end
 
     def ==(other_collection)
@@ -65,15 +74,8 @@ module ReactiveRecord
       @target_klass
     end
 
-
     def <<(item)
       backing_record = item.backing_record
-      # if backing_record and @owner and @association and inverse_of = @association.inverse_of
-      #   item.attributes[inverse_of].attributes[@association.attribute].delete(item) if item.attributes[inverse_of] and item.attributes[inverse_of].attributes[@association.attribute]
-      #   item.attributes[inverse_of] = @owner
-      #   React::State.set_state(backing_record, inverse_of, @owner) unless backing_record.data_loading?
-      # end
-      #all << item unless all.include? item
       all << item unless all.include? item
       if backing_record and @owner and @association and inverse_of = @association.inverse_of and item.attributes[inverse_of] != @owner
         current_association = item.attributes[inverse_of]
@@ -81,8 +83,12 @@ module ReactiveRecord
         current_association.attributes[@association.attribute].delete(item) if current_association and current_association.attributes[@association.attribute]
         @owner.backing_record.update_attribute(@association.attribute) # forces a check if association contents have changed from synced values
       end
-      @collection.delete(@dummy_record)
-      @dummy_record = @dummy_collection = nil
+      if item.id and @dummy_record
+        @dummy_record.id = item.id
+        @collection.delete(@dummy_record)
+        @dummy_record = @collection.detect { |r| r.backing_record.vector.last =~ /^\*[0-9]+$/ }
+        @dummy_collection = nil
+      end
       self
     end
 

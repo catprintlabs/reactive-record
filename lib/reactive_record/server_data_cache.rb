@@ -188,7 +188,11 @@ module ReactiveRecord
           end
 
           def apply_method(method)
-            method[0] = "find" if method.is_a? Array and method.first == "find_by_id"
+            if method.is_a? Array and method.first == "find_by_id"
+              method[0] = "find"
+            elsif method.is_a? String and method =~ /^\*[0-9]+$/
+              method = "*"
+            end
             new_vector = vector + [method]
             @db_cache.detect { |cached_item| cached_item.vector == new_vector} || build_new_instances(method)
           end
