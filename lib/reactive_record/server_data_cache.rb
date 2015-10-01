@@ -226,7 +226,7 @@ module ReactiveRecord
               children = [@ar_object]
             end
             if @parent
-              if method == "*"
+              if method =~ /^\*[0-9]+$/
                 if @ar_object.is_a? Array  # this happens when a scope is empty there is test case, but
                   @parent.as_hash({})      # does it work for all edge cases?
                 else
@@ -264,8 +264,8 @@ module ReactiveRecord
           new_target = nil
           if !target
             load_from_json(value, Object.const_get(method))
-          elsif method == "*all"
-            target.replace value.collect { |id| target.proxy_association.klass.find(id) } unless ignore_all
+          #elsif method == "*all"
+          #  target.replace value.collect { |id| target.proxy_association.klass.find(id) } unless ignore_all
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
             ignore_all = true
             target << (new_target = target.proxy_association.klass.find(method))
@@ -276,13 +276,13 @@ module ReactiveRecord
               target.attributes[[method]] = value.first
             end
           elsif value.is_a? Array
-            #target.send "#{method}=", value.first
-            target.backing_record.reactive_set!(method, value.first)
+            target.send "#{method}=", value.first
+            #target.backing_record.reactive_set!(method, value.first)
           elsif value.is_a? Hash and value[:id] and value[:id].first #and
             association = target.class.reflect_on_association(method)
             new_target = association.klass.find(value[:id].first)
-            #target.send "#{method}=", new_target
-            target.backing_record.reactive_set!(method, new_target)
+            target.send "#{method}=", new_target
+            #target.backing_record.reactive_set!(method, new_target)
           else
             # target might be able to respond to method directly so we can't optimize out the target send
             new_target = target.send("#{method}=", target.send(method))

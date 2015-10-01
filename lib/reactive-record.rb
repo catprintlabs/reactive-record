@@ -1,5 +1,5 @@
 if RUBY_ENGINE == 'opal'
-  
+
   require "reactive-ruby"
   require "reactive_record/active_record/error"
   require "reactive_record/server_data_cache"
@@ -12,31 +12,32 @@ if RUBY_ENGINE == 'opal'
   require "reactive_record/active_record/class_methods"
   require "reactive_record/active_record/instance_methods"
   require "reactive_record/active_record/base"
+  #require "reactive-record/object"
   require "reactive_record/interval"
-  
+
 else
-  
+
   module ::ActiveRecord
     module Core
       module ClassMethods
-        def inherited(child_class) 
+        def inherited(child_class)
           begin
             file = Rails.root.join('app','models',"#{child_class.name.underscore}.rb").to_s rescue nil
-            begin 
-              require file 
+            begin
+              require file
             rescue LoadError
             end
             # from active record:
             child_class.initialize_find_by_cache
-          rescue 
+          rescue
           end
           super
         end
       end
     end
   end
-  
-  
+
+
   require "opal"
   require "reactive_record/version"
   require "reactive_record/permissions"
@@ -47,5 +48,5 @@ else
 
   Opal.append_path File.expand_path('../', __FILE__).untaint
   Opal.append_path File.expand_path('../../vendor', __FILE__).untaint
-  
+
 end

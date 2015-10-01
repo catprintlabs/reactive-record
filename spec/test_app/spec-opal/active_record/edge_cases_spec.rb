@@ -36,4 +36,49 @@ use_case "server loading edge cases" do
     end
   end
 
+  and_it "will load the same record via two different methods" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      # first load a record one way
+      # on load retry we want to just insure the contents are loaded, but we are still pointing the same instance
+      @r1 ||= User.find_by_email("mitch@catprint.com")
+      @r1.address.zip # just so we grab something that is not the id
+      @r1
+    end.then do |r1|
+      ReactiveRecord.load do
+        # now repeat but get teh record a different way, this will return a different instance
+        @r2 ||= User.find_by_first_name("Mitch")
+        @r2.last_name # lets get the last name, when loaded the two record ids will match and will be merged
+        @r2
+      end.then_test do |r2|
+        expect(r1.last_name).to eq(r2.last_name)
+        expect(r1).to eq(r2)
+        expect(r1).not_to be(r2)
+      end
+    end
+  end
+
+  and_it "will load the same record via two different methods via a collection" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      # first load a record one way
+      # on load retry we want to just insure the contents are loaded, but we are still pointing the same instance
+      @r1 ||= User.find_by_email("mitch@catprint.com").todo_items.first
+      @r1.title # just so we grab something that is not the id
+      @r1
+    end.then do |r1|
+      ReactiveRecord.load do
+        # now repeat but get teh record a different way, this will return a different instance
+        @r2 ||= TodoItem.find_by_title("#{r1.title}") # to make sure there is no magic lets make the title into a new string
+        @r2.description # lets get the description, when loaded the two record ids will match and will be merged
+        @r2
+      end.then_test do |r2|
+        `debugger`
+        expect(r1.description).to eq(r2.description)
+        expect(r1).to eq(r2)
+        expect(r1).not_to be(r2)
+      end
+    end
+  end
+
 end

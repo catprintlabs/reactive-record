@@ -116,7 +116,8 @@ module ReactiveRecord
       end
 
       def ==(other_value)
-        other_value.is_a? DummyValue
+        nil  # dummy values can't ever equal anything
+        #other_value.is_a? DummyValue
       end
 
       def to_s

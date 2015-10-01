@@ -1,5 +1,5 @@
 source "http://rubygems.org"
-gem "rails" 
+gem "rails"
 gem 'sqlite3'
 gem 'opal', "~> 0.8"
 gem 'react-rails', File.exist?("../../../react-rails") ? {path: "../../../react-rails"} :  {git: "https://github.com/catprintlabs/react-rails.git", :branch => 'isomorphic-methods-support'}

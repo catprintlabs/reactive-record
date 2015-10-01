@@ -103,9 +103,13 @@ module ReactiveRecord
     end
 
     def replace(new_array)
-      #return new_array if @collection == new_array  #not sure we need this anymore
+
+      # not tested if you do all[n] where n > 0... this will create additional dummy items, that this will not sync up.
+      # probably just moving things around so the @dummy_collection and @dummy_record are updated AFTER the new items are pushed
+      # should work.
+
       @dummy_collection.notify if @dummy_collection
-      @collection.dup.each { |item| delete(item) } if @collection
+      @collection.dup.each { |item| delete(item) } if @collection  # this line is a big nop I think
       @collection = []
       if new_array.is_a? Collection
         @dummy_collection = new_array.dummy_collection
@@ -128,6 +132,17 @@ module ReactiveRecord
       else
         all.delete(item)
       end
+    end
+
+    def get_at(index)
+      if @dummy_collection and index >= @collection.length
+        (@collection.length..index).each do |i|
+          new_dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*" ) #{}"#{i}")
+          new_dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
+          @collection << new_dummy_record
+        end
+      end
+      @collection[index]
     end
 
     def method_missing(method, *args, &block)
