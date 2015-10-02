@@ -27,6 +27,69 @@ describe "integration with react" do
     html == "SAME OBJECT"
   end
 
+  it "will find two different attributes will not be equal before loading" do
+    r1 = User.find_by_email("mitch@catprint.com")
+    expect(r1.first_name).not_to eq(r1.last_name)
+  end
+
+  it "will find the same attributes to be equal before loading" do
+    r1 = User.find_by_email("mitch@catprint.com")
+    expect(r1.first_name).to eq(r1.first_name)
+  end
+
+  rendering("find by two methods gives same attributes once loaded") do
+    r1 = User.find_by_email("mitch@catprint.com")
+    r2 = User.find_by_first_name("Mitch")
+    if r1.first_name == r2.first_name
+      "SAME VALUE"
+    else
+      "NOT YET"
+    end
+  end.should_generate do
+    html == "SAME VALUE"
+  end
+
+  it "will know that an attribute is loading" do
+    r1 = User.find_by_email("mitch@catprint.com")
+    expect(r1.first_name).to be_loading
+  end
+
+  rendering("an attribute will eventually set it not loading") do
+    User.find_by_email("mitch@catprint.com").first_name.loading? ? "LOADING" : "LOADED"
+  end.should_generate do
+    html == "LOADED"
+  end
+
+  it "will know that an attribute is not loaded" do
+    r1 = User.find_by_email("mitch@catprint.com")
+    expect(r1.first_name).not_to be_loaded
+  end
+
+  rendering("an attribute will eventually set it loaded") do
+    User.find_by_email("mitch@catprint.com").first_name.loaded? ? "LOADED" : "LOADING"
+  end.should_generate do
+    html == "LOADED"
+  end
+
+  it "present? returns true for a non-nil value" do
+    expect("foo").to be_present
+  end
+
+  it "present? returns false for nil" do
+    expect(false).not_to be_present
+  end
+
+  it "will consider a unloaded attribute not to be present" do
+    r1 = User.find_by_email("mitch@catprint.com")
+    expect(r1.first_name).not_to be_present
+  end
+
+  rendering("a non-nil attribute will make it present") do
+    User.find_by_email("mitch@catprint.com").first_name.present? ? "PRESENT" : ""
+  end.should_generate do
+    html == "PRESENT"
+  end
+
   rendering("a simple find_by query") do
     User.find_by_email("mitch@catprint.com").email
   end.should_immediately_generate do

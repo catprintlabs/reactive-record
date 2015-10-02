@@ -226,7 +226,7 @@ module ReactiveRecord
               children = [@ar_object]
             end
             if @parent
-              if method =~ /^\*[0-9]+$/
+              if method == "*"
                 if @ar_object.is_a? Array  # this happens when a scope is empty there is test case, but
                   @parent.as_hash({})      # does it work for all edge cases?
                 else
@@ -255,17 +255,19 @@ module ReactiveRecord
         ignore_all = nil
 
         # have to process *all before any other items
-        if sorted_collection = tree.delete("*all")
+        # we leave the "*all" key in just for debugging purposes, and then skip it below
+
+        if sorted_collection = tree["*all"]
           target.replace sorted_collection.collect { |id| target.proxy_association.klass.find(id) }
         end
 
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil
-          if !target
+          if method == "*all"
+            next # its already been processed above
+          elsif !target
             load_from_json(value, Object.const_get(method))
-          #elsif method == "*all"
-          #  target.replace value.collect { |id| target.proxy_association.klass.find(id) } unless ignore_all
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
             ignore_all = true
             target << (new_target = target.proxy_association.klass.find(method))
@@ -277,14 +279,11 @@ module ReactiveRecord
             end
           elsif value.is_a? Array
             target.send "#{method}=", value.first
-            #target.backing_record.reactive_set!(method, value.first)
           elsif value.is_a? Hash and value[:id] and value[:id].first #and
             association = target.class.reflect_on_association(method)
             new_target = association.klass.find(value[:id].first)
             target.send "#{method}=", new_target
-            #target.backing_record.reactive_set!(method, new_target)
           else
-            # target might be able to respond to method directly so we can't optimize out the target send
             new_target = target.send("#{method}=", target.send(method))
           end
           load_from_json(value, new_target) if new_target

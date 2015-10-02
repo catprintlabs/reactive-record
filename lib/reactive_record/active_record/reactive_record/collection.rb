@@ -43,7 +43,8 @@ module ReactiveRecord
     end
 
     def [](index)
-      if @dummy_collection and index >= @collection.length
+
+      if (@collection || all).length <= index and @dummy_collection
         (@collection.length..index).each do |i|
           new_dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*#{i}")
           new_dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
@@ -76,7 +77,7 @@ module ReactiveRecord
 
     def <<(item)
       backing_record = item.backing_record
-      all << item unless all.include? item
+      all << item unless all.include? item # does this use == if so we are okay...
       if backing_record and @owner and @association and inverse_of = @association.inverse_of and item.attributes[inverse_of] != @owner
         current_association = item.attributes[inverse_of]
         backing_record.update_attribute(inverse_of, @owner)
@@ -108,7 +109,14 @@ module ReactiveRecord
       # probably just moving things around so the @dummy_collection and @dummy_record are updated AFTER the new items are pushed
       # should work.
 
-      @dummy_collection.notify if @dummy_collection
+      if @dummy_collection
+        @dummy_collection.notify
+        array = new_array.is_a?(Collection) ? new_array.collection : new_array
+        @collection.each_with_index do |r, i|
+          r.id = new_array[i].id if array[i] and array[i].id and r.backing_record.vector.last =~ /^\*[0-9]+$/
+        end
+      end
+
       @collection.dup.each { |item| delete(item) } if @collection  # this line is a big nop I think
       @collection = []
       if new_array.is_a? Collection
@@ -132,17 +140,6 @@ module ReactiveRecord
       else
         all.delete(item)
       end
-    end
-
-    def get_at(index)
-      if @dummy_collection and index >= @collection.length
-        (@collection.length..index).each do |i|
-          new_dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*" ) #{}"#{i}")
-          new_dummy_record.backing_record.attributes[@association.inverse_of] = @owner if @association and @association.inverse_of
-          @collection << new_dummy_record
-        end
-      end
-      @collection[index]
     end
 
     def method_missing(method, *args, &block)

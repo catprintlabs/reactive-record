@@ -73,10 +73,23 @@ use_case "server loading edge cases" do
         @r2.description # lets get the description, when loaded the two record ids will match and will be merged
         @r2
       end.then_test do |r2|
-        `debugger`
         expect(r1.description).to eq(r2.description)
         expect(r1).to eq(r2)
         expect(r1).not_to be(r2)
+      end
+    end
+  end
+
+  and_it "will load a record by indexing a collection" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      User.find_by_email("mitch@catprint.com").todo_items.collect { |todo| todo.description }
+    end.then do |descriptions|
+      React::IsomorphicHelpers.load_context
+      ReactiveRecord.load do
+        User.find_by_email("mitch@catprint.com").todo_items[1].description
+      end.then_test do |description|
+        expect(description).to eq(descriptions[1])
       end
     end
   end

@@ -86,71 +86,95 @@ module ReactiveRecord
       DummyValue.new
     end
 
-    class DummyValue < NilClass
+    if RUBY_ENGINE == 'opal'
+      class ::Object
 
-      def notify
-        unless ReactiveRecord::Base.data_loading?
-          ReactiveRecord.loads_pending!           #loads
-          ReactiveRecord::WhileLoading.loading!   #loads
+        def loaded?
+          !loading?
         end
-      end
 
-      def initialize()
-        notify
-      end
-
-      def method_missing(method, *args, &block)
-        if 0.respond_to? method
-          notify
-          0.send(method, *args, &block)
-        elsif "".respond_to? method
-          notify
-          "".send(method, *args, &block)
-        else
-          super
+        def loading?
+          false
         end
+
+        def present?
+          !!self
+        end
+
       end
 
-      def coerce(s)
-        [self.send("to_#{s.class.name.downcase}"), s]
-      end
+      class DummyValue < NilClass
 
-      def ==(other_value)
-        nil  # dummy values can't ever equal anything
-        #other_value.is_a? DummyValue
-      end
+        def notify
+          unless ReactiveRecord::Base.data_loading?
+            ReactiveRecord.loads_pending!           #loads
+            ReactiveRecord::WhileLoading.loading!   #loads
+          end
+        end
 
-      def to_s
-        notify
-        ""
-      end
+        def initialize()
+          notify
+        end
 
-      def to_f
-        notify
-        0.0
-      end
+        def method_missing(method, *args, &block)
+          if 0.respond_to? method
+            notify
+            0.send(method, *args, &block)
+          elsif "".respond_to? method
+            notify
+            "".send(method, *args, &block)
+          else
+            super
+          end
+        end
 
-      def to_i
-        notify
-        0
-      end
+        def loading?
+          true
+        end
 
-      def to_numeric
-        notify
-        0
-      end
+        def present?
+          false
+        end
 
-      def to_date
-        notify
-        "2001-01-01T00:00:00.000-00:00".to_date
-      end
+        def coerce(s)
+          [self.send("to_#{s.class.name.downcase}"), s]
+        end
 
-      def acts_as_string?
-        true
-      end
+        def ==(other_value)
+          other_value.object_id == self.object_id
+        end
 
+        def to_s
+          notify
+          ""
+        end
+
+        def to_f
+          notify
+          0.0
+        end
+
+        def to_i
+          notify
+          0
+        end
+
+        def to_numeric
+          notify
+          0
+        end
+
+        def to_date
+          notify
+          "2001-01-01T00:00:00.000-00:00".to_date
+        end
+
+        def acts_as_string?
+          true
+        end
+
+      end
     end
-
 
     def self.schedule_fetch
       #ReactiveRecord.loads_pending!
@@ -167,7 +191,7 @@ module ReactiveRecord
             begin
               ReactiveRecord::Base.load_from_json(response.json)
             rescue Exception => e
-              log("Exception raised while loading json from server: #{e}", :error)
+              log("Unexpected exception raised while loading json from server: #{e}", :error)
             end
             log("       Processed in: #{(Time.now-fetch_time).to_i}s")
             log(["       Returned: %o", response.json.to_n])
