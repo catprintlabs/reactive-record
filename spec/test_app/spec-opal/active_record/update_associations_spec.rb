@@ -10,7 +10,7 @@ use_case "updating associations" do
     ReactiveRecord.load do
       User.find_by_first_name("Jon").id
     end.then_test do |id|
-      expect(id).to be_empty
+      expect(id).to be_nil
       React::IsomorphicHelpers.load_context
       jon = User.new({first_name: "Jon", last_name: "Weaver"})
     end
@@ -94,7 +94,7 @@ use_case "updating associations" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       TodoItem.find_by_title("Jon's first todo!").user # load the todo in prep for the next test
-      User.find_by_first_name("Jan").todo_items.count
+      User.find_by_first_name("Jan").todo_items.all.count
     end.then_test do |count|
       expect(count).to be(0)
     end
@@ -119,7 +119,7 @@ use_case "updating associations" do
     ReactiveRecord.load do
       TodoItem.find_by_title("Jon's first todo!").id
     end.then_test do | id |
-      expect(id).to be_empty
+      expect(id).to be_nil
     end
   end
 
@@ -141,6 +141,8 @@ use_case "updating associations" do
 
   and_it "can be deleted of course" do
     TodoItem.find_by_title("round to it").destroy.then_test do
+      xxx = TodoItem.find_by_title("round to it")
+      `debugger`
       expect(TodoItem.find_by_title("round to it")).to be_destroyed
     end
   end

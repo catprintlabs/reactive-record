@@ -67,6 +67,19 @@ module ReactiveRecord
       @scopes[scope] ||= Collection.new(@target_klass, @owner, @association, *@vector, [scope])
     end
 
+    def count
+      if @collection
+        @collection.count
+      elsif @count ||= ReactiveRecord::Base.fetch_from_db([*@vector, "*count"])
+        @count
+      else
+        ReactiveRecord::Base.load_from_db(*@vector, "*count")
+        @count = 1
+      end
+    end
+
+    alias_method :length, :count
+
     def proxy_association
       @association || self # returning self allows this to work with things like Model.all
     end
@@ -140,6 +153,11 @@ module ReactiveRecord
       else
         all.delete(item)
       end
+    end
+
+    def loading?
+      all # need to force initialization at this point
+      @dummy_collection.loading?
     end
 
     def method_missing(method, *args, &block)

@@ -32,6 +32,7 @@ module ReactiveRecord
     attr_accessor :changed_attributes
     attr_accessor :aggregate_owner
     attr_accessor :aggregate_attribute
+    attr_accessor :destroyed
 
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -156,7 +157,11 @@ module ReactiveRecord
 
     def reactive_get!(attribute)
       unless @destroyed
-        apply_method(attribute) unless @attributes.has_key? attribute
+        if @attributes.has_key? attribute
+          attributes[attribute].notify if @attributes[attribute].is_a? DummyValue
+        else
+          apply_method(attribute)
+        end
         React::State.get_state(self, attribute) unless data_loading?
         attributes[attribute]
       end
@@ -261,7 +266,7 @@ module ReactiveRecord
           @synced_attributes[key] = value.dup_for_sync
         elsif aggregation = model.reflect_on_aggregation(key)
           value.backing_record.sync!
-        else
+        elsif !model.reflect_on_association(key)
           @synced_attributes[key] = JSON.parse(value.to_json)
         end
       end

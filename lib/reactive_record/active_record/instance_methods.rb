@@ -89,6 +89,10 @@ module ActiveRecord
       @backing_record.destroy &block
     end
 
+    def destroyed?
+      @backing_record.destroyed
+    end
+
     def new?
       @backing_record.new?
     end

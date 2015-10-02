@@ -10,7 +10,7 @@ use_case "updating aggregations" do
     ReactiveRecord.load do
       User.find_by_first_name("Jon").id
     end.then_test do |id|
-      expect(id).to be_empty
+      expect(id).to be_nil
       React::IsomorphicHelpers.load_context
       jon = User.new({first_name: "Jon", last_name: "Weaver"})
     end

@@ -200,6 +200,8 @@ module ReactiveRecord
           def build_new_instances(method)
             if method == "*all"
               apply_method_to_cache("*all") { |cache_item| cache_item.value.collect { |record| record.id } }
+            elsif method == "*count"
+              apply_method_to_cache("*count") { |cache_item| cache_item.value.count }
             elsif method == "*"
               if @ar_object and @ar_object.length > 0
                 @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
@@ -268,12 +270,15 @@ module ReactiveRecord
             next # its already been processed above
           elsif !target
             load_from_json(value, Object.const_get(method))
+          elsif method == "*count"
+            target.instance_variable_set(:@count, value.first)
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
-            ignore_all = true
             target << (new_target = target.proxy_association.klass.find(method))
           elsif method.is_a? Array
             if !(target.class < ActiveRecord::Base)
-              new_target = target.send *method unless value.is_a? Array # value is an array if scope returns nil
+              new_target = target.send *method
+              # value is an array if scope returns nil, so we destroy the bogus record
+              new_target.destroy and new_target = nil if value.is_a? Array
             else
               target.attributes[[method]] = value.first
             end

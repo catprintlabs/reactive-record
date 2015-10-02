@@ -364,6 +364,8 @@ module ReactiveRecord
               puts "aggregate attributes after merge = #{aggregate.attributes}"
               parent.send("#{association[:attribute]}=", aggregate)
               puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
+              raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
             elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
               puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
               #parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
@@ -442,8 +444,13 @@ module ReactiveRecord
           promise.resolve({success: true})
         end
 
-        @attributes = {}
-        sync!
+        # DO NOT CLEAR ATTRIBUTES.  Records that are not found, are destroyed, and if they are searched for again, we want to make
+        # sure to find them.  We may want to change this, and provide a separate flag called not_found.  In this case you
+        # would put these lines here:
+        # @attributes = {}
+        # sync!
+        # and modify server_data_cache so that it does NOT call destroy
+
         @destroyed = true
 
         promise
