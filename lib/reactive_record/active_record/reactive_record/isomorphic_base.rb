@@ -445,7 +445,7 @@ module ReactiveRecord
 
         promise = Promise.new
 
-        if id or vector
+        if !data_loading? and (id or vector)
           HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: ar_instance.model_name, id: id, vector: vector}).then do |response|
             yield response.json[:success], response.json[:message] if block
             promise.resolve response.json
