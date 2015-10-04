@@ -16,6 +16,13 @@ class User < ActiveRecord::Base
     "#{first_name} #{last_name}"
   end
 
+  # two examples of server side calculated attributes.  The second takes a parameter.
+  # the first does not rely on an id, so can be used before the record is saved.
+
+  def detailed_name
+    "#{first_name[0]}. #{last_name} #{' - '+email if email}"
+  end unless RUBY_ENGINE == 'opal'
+
   def expensive_math(n)
     n+id.to_i
   end unless RUBY_ENGINE == 'opal'

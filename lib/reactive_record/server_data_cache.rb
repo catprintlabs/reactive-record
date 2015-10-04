@@ -225,7 +225,7 @@ module ReactiveRecord
           def as_hash(children = nil)
             unless children
               return {} if @ar_object.is_a?(Class) and (@ar_object < ActiveRecord::Base)
-              children = [@ar_object]
+              children = [@ar_object.is_a?(BigDecimal) ? @ar_object.to_f : @ar_object]
             end
             if @parent
               if method == "*"

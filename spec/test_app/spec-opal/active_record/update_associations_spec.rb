@@ -141,8 +141,6 @@ use_case "updating associations" do
 
   and_it "can be deleted of course" do
     TodoItem.find_by_title("round to it").destroy.then_test do
-      xxx = TodoItem.find_by_title("round to it")
-      `debugger`
       expect(TodoItem.find_by_title("round to it")).to be_destroyed
     end
   end

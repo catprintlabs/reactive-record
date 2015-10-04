@@ -225,82 +225,93 @@ module ReactiveRecord
 
         elsif force or changed?
 
-          # we want to pass not just the model data to save, but also enough information so that on return from the server
-          # we can update the models on the client
+          begin
 
-          # input
-          records_to_process = [self]  # list of records to process, will grow as we chase associations
-          # outputs
-          models = [] # the actual data to save {id: record.object_id, model: record.model.model_name, attributes: changed_attributes}
-          associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
-          # used to keep track of records that have been processed for effeciency
-          backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record
+            # we want to pass not just the model data to save, but also enough information so that on return from the server
+            # we can update the models on the client
 
-          add_new_association = lambda do |record, attribute, assoc_record|
-            unless backing_records[assoc_record.object_id]
-              records_to_process << assoc_record
-              backing_records[assoc_record.object_id] = assoc_record
+            # input
+            records_to_process = [self]  # list of records to process, will grow as we chase associations
+            # outputs
+            models = [] # the actual data to save {id: record.object_id, model: record.model.model_name, attributes: changed_attributes}
+            associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
+            # used to keep track of records that have been processed for effeciency
+            backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record
+
+            add_new_association = lambda do |record, attribute, assoc_record|
+              unless backing_records[assoc_record.object_id]
+                records_to_process << assoc_record
+                backing_records[assoc_record.object_id] = assoc_record
+              end
+              associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
             end
-            associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
-          end
 
-          record_index = 0
-          while(record_index < records_to_process.count)
-            record = records_to_process[record_index]
-            output_attributes = {record.model.primary_key => record.id}
-            models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes}
-            record.attributes.each do |attribute, value|
-              if association = record.model.reflect_on_association(attribute)
-                if association.collection?
-                  value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
-                elsif value
+            record_index = 0
+            while(record_index < records_to_process.count)
+              record = records_to_process[record_index]
+              if record.id.loading?
+                raise "Attempt to save a model while it or an associated model is still loading: model being saved: #{self.model}:#{self.id}#{', associated model: '+record.model.to_s if record != self}"
+              end
+              output_attributes = {record.model.primary_key => record.id}
+              models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes}
+              record.attributes.each do |attribute, value|
+                if association = record.model.reflect_on_association(attribute)
+                  if association.collection?
+                    value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
+                  elsif value
+                    add_new_association.call record, attribute, value.backing_record
+                  else
+                    output_attributes[attribute] = nil
+                  end
+                elsif record.model.reflect_on_aggregation(attribute)
                   add_new_association.call record, attribute, value.backing_record
-                else
-                  output_attributes[attribute] = nil
+                elsif record.changed?(attribute)
+                  output_attributes[attribute] = value
                 end
-              elsif record.model.reflect_on_aggregation(attribute)
-                add_new_association.call record, attribute, value.backing_record
-              elsif record.changed?(attribute)
-                output_attributes[attribute] = value
-              end
-            end if record.changed? || (record == self && force)
-            record_index += 1
-          end
-
-          backing_records.each { |id, record| record.saving! }
-
-          promise = Promise.new
-
-          HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations, validate: validate}).then do |response|
-            begin
-              response.json[:models] = response.json[:saved_models].collect do |item|
-                backing_records[item[0]].ar_instance
-              end
-
-              if response.json[:success]
-                response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
-              else
-                log("Reactive Record Save Failed: #{response.json[:message]}", :error)
-                response.json[:saved_models].each do | item |
-                  log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
-                end
-              end
-
-              response.json[:saved_models].each { | item | backing_records[item[0]].errors! item[3] }
-
-              yield response.json[:success], response.json[:message], response.json[:models]  if block
-              promise.resolve response.json
-
-              backing_records.each { |id, record| record.saved! }
-
-            rescue Exception => e
-              puts "Save Failed: #{e}"
+              end if record.changed? || (record == self && force)
+              record_index += 1
             end
+
+            backing_records.each { |id, record| record.saving! }
+
+            promise = Promise.new
+
+            HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations, validate: validate}).then do |response|
+              begin
+                response.json[:models] = response.json[:saved_models].collect do |item|
+                  backing_records[item[0]].ar_instance
+                end
+
+                if response.json[:success]
+                  response.json[:saved_models].each { | item | backing_records[item[0]].sync!(item[2]) }
+                else
+                  log("Reactive Record Save Failed: #{response.json[:message]}", :error)
+                  response.json[:saved_models].each do | item |
+                    log("  Model: #{item[1]}[#{item[0]}]  Attributes: #{item[2]}  Errors: #{item[3]}", :error) if item[3]
+                  end
+                end
+
+                response.json[:saved_models].each { | item | backing_records[item[0]].errors! item[3] }
+
+                yield response.json[:success], response.json[:message], response.json[:models]  if block
+                promise.resolve response.json
+
+                backing_records.each { |id, record| record.saved! }
+
+              rescue Exception => e
+                puts "Save Failed: #{e}"
+              end
+            end
+            promise
+          rescue Exception => e
+            log("Exception raised while saving - #{e}", :error)
+            yield false, e.message, [] if block
+            promise.resolve({success: false, message: e.message, models: []})
+            promise
           end
-          promise
         else
           promise = Promise.new
-          yield true, nil if block
+          yield true, nil, [] if block
           promise.resolve({success: true})
           promise
         end

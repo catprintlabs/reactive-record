@@ -39,6 +39,14 @@ use_case "creating and updating a record" do
     test { expect(jon.changed?).to be_truthy }
   end
 
+  # and_it "can get server side attributes" do
+  #   ReactiveRecord.load do
+  #     User.find_by_first_name("Jon").detailed_name
+  #   end.then_test do |name|
+  #     expect(name).to eq("J. Weaver")
+  #   end
+  # end
+
   and_it "can be saved" do
     jon = User.find_by_first_name("Jon")
     jon.save.while_waiting { expect(jon.saving?).to be_truthy }
@@ -73,7 +81,17 @@ use_case "creating and updating a record" do
     test { expect(jon.id).not_to be_nil }
   end
 
-  and_it "can be updated and saved" do
+  # and_it "can be updated and it will get new server side values before saving" do
+  #   jon = User.find_by_last_name("Weaver")
+  #   jon.email = "jon@catprint.com"
+  #   ReactiveRecord.load do
+  #     jon.detailed_name
+  #   end.then_test do | detailed_name |
+  #     expect(detailed_name).to eq("J. Weaver - jon@catprint.com")
+  #   end
+  # end
+
+  and_it "can be saved and will remember the new values" do
     jon = User.find_by_last_name("Weaver")
     jon.email = "jon@catprint.com"
     jon.save.then do
