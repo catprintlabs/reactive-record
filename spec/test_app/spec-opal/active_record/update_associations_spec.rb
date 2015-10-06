@@ -29,7 +29,7 @@ use_case "updating associations" do
 
   now_it "will save everything" do
     jon = User.find_by_first_name("Jon")
-    jon.save.while_waiting { expect(jon.saving?).to be_truthy }
+    jon.save.while_waiting { expect(jon).to be_saving }
   end
 
   now_it "will have one todo item in the data base" do

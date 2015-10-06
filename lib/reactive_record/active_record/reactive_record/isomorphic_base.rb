@@ -8,13 +8,14 @@ module ReactiveRecord
 
     before_first_mount do |context|
       if RUBY_ENGINE != 'opal'
-        @server_data_cache = ReactiveRecord::ServerDataCache.new(context.controller.acting_user)
+        @server_data_cache = ReactiveRecord::ServerDataCache.new(context.controller.acting_user, {})
       else
         @fetch_scheduled = nil
         @records = Hash.new { |hash, key| hash[key] = [] }
         @class_scopes = Hash.new { |hash, key| hash[key] = {} }
         if on_opal_client?
           @pending_fetches = []
+          @pending_records = []
           @last_fetch_at = Time.now
           unless `typeof window.ReactiveRecordInitialData === 'undefined'`
             log(["Reactive record prerendered data being loaded: %o", `window.ReactiveRecordInitialData`])
@@ -71,7 +72,7 @@ module ReactiveRecord
     # queue up fetches, and at the end of each rendering cycle fetch the records
     # notify that loads are pending
 
-    def self.load_from_db(*vector)
+    def self.load_from_db(record, *vector)
       return nil unless on_opal_client? # this can happen when we are on the server and a nil value is returned for an attribute
       # only called from the client side
       # pushes the value of vector onto the a list of vectors that will be loaded from the server when the next
@@ -79,8 +80,10 @@ module ReactiveRecord
       # takes care of informing react that there are things to load, and schedules the loader to run
       # Note there is no equivilent to find_in_db, because each vector implicitly does a find.
       raise "attempt to do a find_by_id of nil.  This will return all records, and is not allowed" if vector[1] == ["find_by_id", nil]
+      vector = [record.model.model_name, ["new", record.object_id]]+vector[1..-1] if vector[0].nil?
       unless data_loading?
         @pending_fetches << vector
+        @pending_records << record if record
         schedule_fetch
       end
       DummyValue.new
@@ -177,15 +180,15 @@ module ReactiveRecord
     end
 
     def self.schedule_fetch
-      #ReactiveRecord.loads_pending!
-      #ReactiveRecord::WhileLoading.loading!
       @fetch_scheduled ||= after(0.01) do
-        if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches
+        if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches otherwise this would never normally happen
           last_fetch_at = @last_fetch_at
           pending_fetches = @pending_fetches.uniq
+          models, associations = gather_records(@pending_records, false, nil)
           log(["Server Fetching: %o", pending_fetches.to_n])
           start_time = Time.now
-          HTTP.post(`window.ReactiveRecordEnginePath`, payload: {pending_fetches: pending_fetches}).then do |response|
+          HTTP.post(`window.ReactiveRecordEnginePath`,
+          payload: {models: models, associations: associations, pending_fetches: pending_fetches}).then do |response|
             fetch_time = Time.now
             log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
             begin
@@ -203,6 +206,7 @@ module ReactiveRecord
             ReactiveRecord.run_blocks_to_load(response.body)
           end
           @pending_fetches = []
+          @pending_records = []
           @last_fetch_at = Time.now
           @fetch_scheduled = nil
         end
@@ -217,6 +221,58 @@ module ReactiveRecord
 
     if RUBY_ENGINE == 'opal'
 
+      def self.gather_records(records_to_process, force, record_being_saved)
+        # we want to pass not just the model data to save, but also enough information so that on return from the server
+        # we can update the models on the client
+
+        # input
+        # list of records to process, will grow as we chase associations
+        # outputs
+        models = [] # the actual data to save {id: record.object_id, model: record.model.model_name, attributes: changed_attributes}
+        associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
+
+        # used to keep track of records that have been processed for effeciency
+        # for quick lookup of records that have been or will be processed [record.object_id] => record
+        records_to_process = records_to_process.uniq
+        backing_records = Hash[*records_to_process.collect { |record| [record.object_id, record] }.flatten(1)]
+
+        add_new_association = lambda do |record, attribute, assoc_record|
+          unless backing_records[assoc_record.object_id]
+            records_to_process << assoc_record
+            backing_records[assoc_record.object_id] = assoc_record
+          end
+          associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
+        end
+
+        record_index = 0
+        while(record_index < records_to_process.count)
+          record = records_to_process[record_index]
+          if record.id.loading? and record_being_saved
+            raise "Attempt to save a model while it or an associated model is still loading: model being saved: #{record_being_saved.model}:#{record_being_saved.id}#{', associated model: '+record.model.to_s if record != record_being_saved}"
+          end
+          output_attributes = {record.model.primary_key => record.id}
+          vector = record.vector || [record.model.model_name, ["new", record.object_id]]
+          models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes, vector: vector}
+          record.attributes.each do |attribute, value|
+            if association = record.model.reflect_on_association(attribute)
+              if association.collection?
+                value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
+              elsif value
+                add_new_association.call record, attribute, value.backing_record
+              else
+                output_attributes[attribute] = nil
+              end
+            elsif record.model.reflect_on_aggregation(attribute)
+              add_new_association.call record, attribute, value.backing_record
+            elsif record.changed?(attribute)
+              output_attributes[attribute] = value
+            end
+          end if record.changed? || (record == record_being_saved && force)
+          record_index += 1
+        end
+        [models, associations, backing_records]
+      end
+
       def save(validate, force, &block)
 
         if data_loading?
@@ -227,50 +283,7 @@ module ReactiveRecord
 
           begin
 
-            # we want to pass not just the model data to save, but also enough information so that on return from the server
-            # we can update the models on the client
-
-            # input
-            records_to_process = [self]  # list of records to process, will grow as we chase associations
-            # outputs
-            models = [] # the actual data to save {id: record.object_id, model: record.model.model_name, attributes: changed_attributes}
-            associations = [] # {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
-            # used to keep track of records that have been processed for effeciency
-            backing_records = {self.object_id => self} # for quick lookup of records that have been or will be processed [record.object_id] => record
-
-            add_new_association = lambda do |record, attribute, assoc_record|
-              unless backing_records[assoc_record.object_id]
-                records_to_process << assoc_record
-                backing_records[assoc_record.object_id] = assoc_record
-              end
-              associations << {parent_id: record.object_id, attribute: attribute, child_id: assoc_record.object_id}
-            end
-
-            record_index = 0
-            while(record_index < records_to_process.count)
-              record = records_to_process[record_index]
-              if record.id.loading?
-                raise "Attempt to save a model while it or an associated model is still loading: model being saved: #{self.model}:#{self.id}#{', associated model: '+record.model.to_s if record != self}"
-              end
-              output_attributes = {record.model.primary_key => record.id}
-              models << {id: record.object_id, model: record.model.model_name, attributes: output_attributes}
-              record.attributes.each do |attribute, value|
-                if association = record.model.reflect_on_association(attribute)
-                  if association.collection?
-                    value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
-                  elsif value
-                    add_new_association.call record, attribute, value.backing_record
-                  else
-                    output_attributes[attribute] = nil
-                  end
-                elsif record.model.reflect_on_aggregation(attribute)
-                  add_new_association.call record, attribute, value.backing_record
-                elsif record.changed?(attribute)
-                  output_attributes[attribute] = value
-                end
-              end if record.changed? || (record == self && force)
-              record_index += 1
-            end
+            models, associations, backing_records = self.class.gather_records([self], force, self)
 
             backing_records.each { |id, record| record.saving! }
 
@@ -319,9 +332,36 @@ module ReactiveRecord
 
     else
 
-      def self.save_records(models, associations, acting_user, validate)
+      def self.find_record(model, id, vector, save)
+        if !save
+          found = vector[1..-1].inject(vector[0]) do |object, method|
+            if method.is_a? Array
+              if method[0] == "new"
+                object.new
+              else
+                object.send(*method)
+              end
+            elsif method.is_a? String and method[0] == "*"
+              object[method.gsub(/^\*/,"").to_i]
+            else
+              object.send(method)
+            end
+          end
+          if id and (found.nil? or !(found.class <= model) or found.id != id)
+            raise "Inconsistent data sent to server - #{model.name}.find(#{id}) != [#{vector}]"
+          end
+          found
+        elsif id
+          model.find(id)
+        else
+          model.new
+        end
+      end
+
+      def self.save_records(models, associations, acting_user, validate, save)
 
         reactive_records = {}
+        vectors = {}
         new_models = []
         saved_models = []
 
@@ -329,8 +369,10 @@ module ReactiveRecord
           attributes = model_to_save[:attributes]
           model = Object.const_get(model_to_save[:model])
           id = attributes.delete(model.primary_key) # if we are saving existing model primary key value will be present
-          reactive_records[model_to_save[:id]] = if id
-            record = model.find(id)
+          vector = model_to_save[:vector]
+          vector[0] = vector[0].constantize
+          record = find_record(model, id, vector, save)
+          reactive_records[model_to_save[:id]] = vectors[vector] = record and if record.id
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
@@ -341,7 +383,6 @@ module ReactiveRecord
             end
             record
           else
-            record = model.new
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
@@ -357,71 +398,83 @@ module ReactiveRecord
 
         puts "!!!!!!!!!!!!!!attributes updated"
 
-        ActiveRecord::Base.transaction do
+        associations.each do |association|
+          parent = reactive_records[association[:parent_id]]
+          parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
+          if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
+            puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+            aggregate = reactive_records[association[:child_id]]
+            current_attributes = parent.send(association[:attribute]).attributes
+            puts "current parent attributes = #{current_attributes}"
+            new_attributes = aggregate.attributes
+            puts "current child attributes = #{new_attributes}"
+            merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
+            puts "merged attributes = #{merged_attributes}"
+            aggregate.assign_attributes(merged_attributes)
+            puts "aggregate attributes after merge = #{aggregate.attributes}"
+            parent.send("#{association[:attribute]}=", aggregate)
+            puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
+          elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
+            raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
+          elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
+            puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
+            puts "Skipped (should be done by belongs to)"
+          else
+            puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+            parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+            puts "updated"
+          end
+        end if associations
 
-          associations.each do |association|
-            parent = reactive_records[association[:parent_id]]
-            parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
-            if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
-              puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-              aggregate = reactive_records[association[:child_id]]
-              current_attributes = parent.send(association[:attribute]).attributes
-              puts "current parent attributes = #{current_attributes}"
-              new_attributes = aggregate.attributes
-              puts "current child attributes = #{new_attributes}"
-              merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
-              puts "merged attributes = #{merged_attributes}"
-              aggregate.assign_attributes(merged_attributes)
-              puts "aggregate attributes after merge = #{aggregate.attributes}"
-              parent.send("#{association[:attribute]}=", aggregate)
-              puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
-            elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
-              raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
-            elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
-              puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
-              #parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]]
-              puts "Skipped (should be done by belongs to)"
-            else
-              puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
-              puts "updated"
-            end
-          end if associations
+        puts "!!!!!!!!!!!!associations updated"
 
-          puts "!!!!!!!!!!!!associations updated"
+        if save
 
-          has_errors = false
+          ActiveRecord::Base.transaction do
 
-          saved_models = reactive_records.collect do |reactive_record_id, model|
-            puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
-            if model.frozen?
-              puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
-              valid = model.valid?
-              puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
-              has_errors ||= (validate and !valid)
-              puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
-              [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
-            elsif !model.id or model.changed?
-              puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
-              saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
-              has_errors ||= !saved
-              messages = model.errors.messages if (validate and !saved) or (!validate and !model.valid?)
-              puts "saved complete errors = <#{!saved}>, #{messages} has_errors #{has_errors}"
-              [reactive_record_id, model.class.name, model.attributes, messages]
-            end
-          end.compact
+            has_errors = false
 
-          raise "Could not save all models" if has_errors
+            saved_models = reactive_records.collect do |reactive_record_id, model|
+              puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
+              if model.frozen?
+                puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+                valid = model.valid?
+                puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
+                has_errors ||= (validate and !valid)
+                puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
+                [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
+              elsif !model.id or model.changed?
+                puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+                saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
+                has_errors ||= !saved
+                messages = model.errors.messages if (validate and !saved) or (!validate and !model.valid?)
+                puts "saved complete errors = <#{!saved}>, #{messages} has_errors #{has_errors}"
+                [reactive_record_id, model.class.name, model.attributes, messages]
+              end
+            end.compact
+
+            raise "Could not save all models" if has_errors
+
+          end
+
+          {success: true, saved_models: saved_models }
+
+        else
+
+          vectors
 
         end
 
-        {success: true, saved_models: saved_models }
 
       rescue Exception => e
         puts "exception #{e}"
         puts e.backtrace.join("\n")
 
-        {success: false, saved_models: saved_models, message: e.message}
+        if save
+          {success: false, saved_models: saved_models, message: e.message}
+        else
+          {}
+        end
 
       end
 
@@ -474,7 +527,7 @@ module ReactiveRecord
         record = if id
           model.find(id)
         else
-          ServerDataCache.new(acting_user)[*vector]
+          ServerDataCache.new(acting_user, {})[*vector]
         end
         record.check_permission_with_acting_user(acting_user, :destroy_permitted?).destroy
         {success: true, attributes: {}}

@@ -5,12 +5,12 @@ module ReactiveRecord
   class ReactiveRecordController < ::ApplicationController
 
     def fetch
-      render :json => ReactiveRecord::ServerDataCache[params[:pending_fetches], acting_user]
+      render :json => ReactiveRecord::ServerDataCache[params[:models], params[:associations], params[:pending_fetches], acting_user]
     end
 
 
     def save
-      render :json => ReactiveRecord::Base.save_records(params[:models], params[:associations], acting_user, params[:validate])
+      render :json => ReactiveRecord::Base.save_records(params[:models], params[:associations], acting_user, params[:validate], true)
     end
 
     def destroy

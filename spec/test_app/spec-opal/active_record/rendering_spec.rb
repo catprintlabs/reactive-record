@@ -162,4 +162,15 @@ describe "integration with react" do
   end.should_generate do
     html == "Timbuktoo"
   end
+
+  rendering("a server side value dynamically changed") do
+    after(0.1) do
+      mitch = User.find_by_email("mitch@catprint.com")
+      mitch.first_name = "Robert"
+      mitch.detailed_name!
+    end
+    User.find_by_email("mitch@catprint.com").detailed_name
+  end.should_generate do
+    html == "R. VanDuyn - mitch@catprint.com"
+  end
 end

@@ -33,6 +33,7 @@ module ReactiveRecord
     attr_accessor :aggregate_owner
     attr_accessor :aggregate_attribute
     attr_accessor :destroyed
+    attr_accessor :updated_during
 
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -87,6 +88,10 @@ module ReactiveRecord
 
       # finally initialize and return the ar_instance
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
+    end
+
+    def self.find_by_object_id(model, object_id)
+      @records[model].detect { |record| record.object_id == object_id }.ar_instance
     end
 
     def self.new_from_vector(model, aggregate_owner, *vector)
@@ -155,12 +160,13 @@ module ReactiveRecord
       @attributes
     end
 
-    def reactive_get!(attribute)
+    def reactive_get!(attribute, server_method_mode = nil)
       unless @destroyed
         if @attributes.has_key? attribute
           attributes[attribute].notify if @attributes[attribute].is_a? DummyValue
+          apply_method(attribute, :force) if server_method_mode == :force
         else
-          apply_method(attribute)
+          apply_method(attribute, server_method_mode)
         end
         React::State.get_state(self, attribute) unless data_loading?
         attributes[attribute]
@@ -219,6 +225,7 @@ module ReactiveRecord
 
     def update_attribute(attribute, *args)
       value = args[0]
+      @synced_attributes[attribute] = value if args.count != 0 and data_loading?
       changed = if args.count == 0
         if association = @model.reflect_on_association(attribute) and association.collection?
           attributes[attribute] != @synced_attributes[attribute]
@@ -236,8 +243,13 @@ module ReactiveRecord
       elsif !changed_attributes.include?(attribute)
         changed_attributes << attribute
       end
+      current_value = attributes[attribute]
       attributes[attribute] = value if args.count != 0
-      React::State.set_state(self, attribute, value) unless data_loading?
+      if !data_loading?
+        React::State.set_state(self, attribute, value)
+      elsif current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
+        after(0.001) { React::State.set_state(self, attribute, value) }
+      end
       if empty_before != changed_attributes.empty?
         React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?) unless data_loading?
         aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
@@ -345,7 +357,7 @@ module ReactiveRecord
       instance
     end
 
-    def apply_method(method)
+    def apply_method(method, server_method_mode = nil)
       # Fills in the value returned by sending "method" to the corresponding server side db instance
       if !new?
         sync_attribute(
@@ -359,9 +371,9 @@ module ReactiveRecord
           elsif aggregation = @model.reflect_on_aggregation(method)
             new_from_vector(aggregation.klass, self, *vector, method)
           elsif id and id != ""
-            self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(*vector, method)
+            self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(self, *vector, method)
           else  # its a attribute in an aggregate or we are on the client and don't know the id
-            self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(*vector, method)
+            self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(self, *vector, method)
           end
         )
       elsif association = @model.reflect_on_association(method) and association.collection?
@@ -372,6 +384,9 @@ module ReactiveRecord
           backing_record.aggregate_owner = self
           backing_record.aggregate_attribute = method
         end
+      elsif server_method_mode
+        dummy_val = self.class.load_from_db(self, *vector, method)
+        @attributes[method] = dummy_val unless @attributes.has_key?(method)
       end
     end
 

@@ -87,16 +87,17 @@ module ReactiveRecord
 
     class ServerDataCache
 
-      def initialize(acting_user)
+      def initialize(acting_user, preloaded_records)
         @acting_user = acting_user
         @cache = []
         @requested_cache_items = []
+        @preloaded_records = preloaded_records
       end
 
       if RUBY_ENGINE != 'opal'
 
         def [](*vector)
-          root = CacheItem.new(@cache, @acting_user, vector[0])
+          root = CacheItem.new(@cache, @acting_user, vector[0], @preloaded_records)
           vector[1..-1].inject(root) { |cache_item, method| cache_item.apply_method method if cache_item }
           vector[0] = vector[0].constantize
           new_items = @cache.select { | cache_item | cache_item.root == root }
@@ -104,8 +105,8 @@ module ReactiveRecord
           new_items.last.value if new_items.last
         end
 
-        def self.[](vectors, acting_user)
-          cache = new(acting_user)
+        def self.[](models, associations, vectors, acting_user)
+          cache = new(acting_user, ReactiveRecord::Base.save_records(models, associations, acting_user, false, false))
           vectors.each { |vector| cache[*vector] }
           cache.as_json
         end
@@ -129,6 +130,7 @@ module ReactiveRecord
         class CacheItem
 
           attr_reader :vector
+          attr_reader :absolute_vector
           attr_reader :record_chain
           attr_reader :root
           attr_reader :acting_user
@@ -141,7 +143,7 @@ module ReactiveRecord
             vector.last
           end
 
-          def self.new(db_cache, acting_user, klass)
+          def self.new(db_cache, acting_user, klass, preloaded_records)
             klass_constant = klass.constantize
             if existing = db_cache.detect { |cached_item| cached_item.vector == [klass_constant] }
               return existing
@@ -149,19 +151,20 @@ module ReactiveRecord
             super
           end
 
-          def initialize(db_cache, acting_user, klass)
+          def initialize(db_cache, acting_user, klass, preloaded_records)
             klass = klass.constantize
             @db_cache = db_cache
             @acting_user = acting_user
-            @vector = [klass]
+            @vector = @absolute_vector = [klass]
             @ar_object = klass
             @record_chain = []
             @parent = nil
             @root = self
+            @preloaded_records = preloaded_records
             db_cache << self
           end
 
-          def apply_method_to_cache(method, &block)
+          def apply_method_to_cache(method, absolute_method, &block)
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
                 if @ar_object.class < ActiveRecord::Base and @ar_object.attributes.has_key?(method)
@@ -171,6 +174,7 @@ module ReactiveRecord
                   new_ar_object = yield cache_item
                   cache_item.clone.instance_eval do
                     @vector = @vector + [method]  # don't push it on since you need a new vector!
+                    @absolute_vector = @absolute_vector + [absolute_method]
                     @ar_object = new_ar_object
                     @db_cache << self
                     @parent = cache_item
@@ -199,19 +203,23 @@ module ReactiveRecord
 
           def build_new_instances(method)
             if method == "*all"
-              apply_method_to_cache("*all") { |cache_item| cache_item.value.collect { |record| record.id } }
+              apply_method_to_cache("*all", "*all") { |cache_item| cache_item.value.collect { |record| record.id } }
             elsif method == "*count"
-              apply_method_to_cache("*count") { |cache_item| cache_item.value.count }
+              apply_method_to_cache("*count", "*count") { |cache_item| cache_item.value.count }
             elsif method == "*"
               if @ar_object and @ar_object.length > 0
+                i = -1
                 @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
-                  apply_method_to_cache(method) { record }
+                  i += 1
+                  apply_method_to_cache(method, "*#{i}") { |cache_item| @preloaded_records[cache_item.absolute_vector + ["*#{i}"]] || record }
                 end
               else
-                apply_method_to_cache(method) {[]}
+                apply_method_to_cache(method, method) {[]}
               end
             else
-              apply_method_to_cache(method) { |cache_item| cache_item.value.send(*method) }
+              apply_method_to_cache(method, method) do |cache_item|
+                @preloaded_records[cache_item.absolute_vector + [method]] || cache_item.value.send(*method)
+              end
             end
           end
 
@@ -275,7 +283,9 @@ module ReactiveRecord
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
             target << (new_target = target.proxy_association.klass.find(method))
           elsif method.is_a? Array
-            if !(target.class < ActiveRecord::Base)
+            if method[0] == "new"
+              new_target = ReactiveRecord::Base.find_by_object_id(target.base_class, method[1])
+            elsif !(target.class < ActiveRecord::Base)
               new_target = target.send *method
               # value is an array if scope returns nil, so we destroy the bogus record
               new_target.destroy and new_target = nil if value.is_a? Array
@@ -293,7 +303,7 @@ module ReactiveRecord
           end
           load_from_json(value, new_target) if new_target
         end
-        target.save if target.respond_to? :save
+        #target.save if target.respond_to? :save
       end
 
 

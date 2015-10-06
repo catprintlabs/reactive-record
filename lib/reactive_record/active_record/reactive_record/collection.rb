@@ -35,7 +35,7 @@ module ReactiveRecord
             @collection << @target_klass.find_by(@target_klass.primary_key => id)
           end
         else
-          @dummy_collection = ReactiveRecord::Base.load_from_db(*@vector, "*all")
+          @dummy_collection = ReactiveRecord::Base.load_from_db(nil, *@vector, "*all")
           @dummy_record = self[0]
         end
       end
@@ -73,7 +73,7 @@ module ReactiveRecord
       elsif @count ||= ReactiveRecord::Base.fetch_from_db([*@vector, "*count"])
         @count
       else
-        ReactiveRecord::Base.load_from_db(*@vector, "*count")
+        ReactiveRecord::Base.load_from_db(nil, *@vector, "*count")
         @count = 1
       end
     end
