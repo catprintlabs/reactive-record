@@ -127,11 +127,11 @@ module ActiveRecord
 
     def _react_param_conversion(param, opt = nil)
       # defines how react will convert incoming json to this ActiveRecord model
-      times = {start: Time.now.to_f, json_start: 0, json_end: 0, db_load_start: 0, db_load_end: 0}
+      #TIMING times = {start: Time.now.to_f, json_start: 0, json_end: 0, db_load_start: 0, db_load_end: 0}
       param_is_native = !param.respond_to?(:is_a?) rescue true
-      times[:json_start] = Time.now.to_f
+      #TIMING times[:json_start] = Time.now.to_f
       param = JSON.from_object param if param_is_native
-      times[:json_end] = Time.now.to_f
+      #TIMING times[:json_end] = Time.now.to_f
       result = if param.is_a? self
         param
       elsif param.is_a? Hash
@@ -144,16 +144,16 @@ module ActiveRecord
           else
             target = new
           end
-          times[:db_load_start] = Time.now.to_f
+          #TIMING times[:db_load_start] = Time.now.to_f
           ReactiveRecord::Base.load_from_json(Hash[param.collect { |key, value| [key, [value]] }], target)
-          times[:db_load_end] = Time.now.to_f
+          #TIMING times[:db_load_end] = Time.now.to_f
           target
         end
       else
         nil
       end
-      times[:end] = Time.now.to_f
-      #puts "times - total: #{'%.04f' % (times[:end]-times[:start])}, native conversion: #{'%.04f' % (times[:json_end]-times[:json_start])}, loading: #{'%.04f' % (times[:db_load_end]-times[:db_load_start])}"
+      #TIMING times[:end] = Time.now.to_f
+      #TIMING puts "times - total: #{'%.04f' % (times[:end]-times[:start])}, native conversion: #{'%.04f' % (times[:json_end]-times[:json_start])}, loading: #{'%.04f' % (times[:db_load_end]-times[:db_load_start])}"
       result
     end
 

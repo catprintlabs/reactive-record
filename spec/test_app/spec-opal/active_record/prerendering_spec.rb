@@ -5,7 +5,7 @@ require 'spec_helper'
 require 'components/test'
 
 describe "prerendering" do
-  
+
   it "passes" do
     expect(true).to be_truthy
   end
@@ -28,8 +28,10 @@ describe "prerendering" do
         expect(mitch.address.zip).to eq("14617")
         expect(mitch.todo_items.find_string("mitch").first.title).to eq("a todo for mitch")
         expect(mitch.todo_items.first.commenters.first.email).to eq("adamg@catprint.com")
+        expect(mitch.expensive_math(13)).to eq(14)
+        expect(mitch.detailed_name).to eq("M. VanDuyn - mitch@catprint.com")
         # clear out everything before moving on otherwise the initial data screws up the next test
-        `delete window.ReactiveRecordInitialData` 
+        `delete window.ReactiveRecordInitialData`
       end
     end
     `container.load('/test', complete)`

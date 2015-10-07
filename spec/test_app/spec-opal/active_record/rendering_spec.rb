@@ -163,14 +163,34 @@ describe "integration with react" do
     html == "Timbuktoo"
   end
 
-  rendering("a server side value dynamically changed") do
-    after(0.1) do
+  rendering("a server side value dynamically changed before first fetch from server") do
+    puts "rendering"
+    @update ||= after(0.001) do
+      puts "async update"
       mitch = User.find_by_email("mitch@catprint.com")
       mitch.first_name = "Robert"
       mitch.detailed_name!
+      puts "updated"
     end
     User.find_by_email("mitch@catprint.com").detailed_name
   end.should_generate do
+    puts "html = #{html}"
     html == "R. VanDuyn - mitch@catprint.com"
   end
+
+  rendering("a server side value dynamically changed after first fetch from server") do
+    puts "rendering"
+    @update ||= after(1) do
+      puts "async update"
+      mitch = User.find_by_email("mitch@catprint.com")
+      mitch.first_name = "Robert"
+      mitch.detailed_name!
+      puts "updated"
+    end
+    User.find_by_email("mitch@catprint.com").detailed_name
+  end.should_generate do
+    puts "html = #{html}"
+    html == "R. VanDuyn - mitch@catprint.com"
+  end
+
 end

@@ -271,6 +271,10 @@ module ReactiveRecord
           target.replace sorted_collection.collect { |id| target.proxy_association.klass.find(id) }
         end
 
+        if id_value = tree["id"] and id_value.is_a? Array
+          target.id = id_value.first
+        end
+
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil
@@ -290,10 +294,10 @@ module ReactiveRecord
               # value is an array if scope returns nil, so we destroy the bogus record
               new_target.destroy and new_target = nil if value.is_a? Array
             else
-              target.attributes[[method]] = value.first
+              target.backing_record.update_attribute([method], value.first)
             end
           elsif value.is_a? Array
-            target.send "#{method}=", value.first
+            target.send "#{method}=", value.first unless method == "id" # we handle ids first so things sync nicely
           elsif value.is_a? Hash and value[:id] and value[:id].first #and
             association = target.class.reflect_on_association(method)
             new_target = association.klass.find(value[:id].first)

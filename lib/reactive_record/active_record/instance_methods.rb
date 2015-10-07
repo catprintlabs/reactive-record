@@ -71,7 +71,7 @@ module ActiveRecord
       elsif args.count == 0 && !block
         @backing_record.reactive_get!(name)
       elsif !block
-        @backing_record.reactive_get!([[name]+args])
+        @backing_record.reactive_get!([[name]+args], :initialize)
       else
         super
       end

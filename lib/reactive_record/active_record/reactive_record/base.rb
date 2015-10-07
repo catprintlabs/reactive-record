@@ -126,6 +126,7 @@ module ReactiveRecord
       @synced_attributes = {}
       @attributes = {}
       @changed_attributes = []
+      @virgin = true
       records[model] << self
     end
 
@@ -153,6 +154,7 @@ module ReactiveRecord
         @ar_instance.instance_variable_set(:@backing_record, existing_record)
         existing_record.attributes.merge!(attributes) { |key, v1, v2| v1 }
       end
+      value
     end
 
     def attributes
@@ -161,6 +163,7 @@ module ReactiveRecord
     end
 
     def reactive_get!(attribute, server_method_mode = nil)
+      @virgin = false unless data_loading?
       unless @destroyed
         if @attributes.has_key? attribute
           attributes[attribute].notify if @attributes[attribute].is_a? DummyValue
@@ -174,6 +177,7 @@ module ReactiveRecord
     end
 
     def reactive_set!(attribute, value)
+      @virgin = false unless data_loading?
       unless @destroyed or (!(attributes[attribute].is_a? DummyValue) and attributes.has_key?(attribute) and attributes[attribute] == value)
         if association = @model.reflect_on_association(attribute)
           if association.collection?
@@ -226,6 +230,10 @@ module ReactiveRecord
     def update_attribute(attribute, *args)
       value = args[0]
       @synced_attributes[attribute] = value if args.count != 0 and data_loading?
+      if @virgin
+        attributes[attribute] = value if args.count != 0
+        return
+      end
       changed = if args.count == 0
         if association = @model.reflect_on_association(attribute) and association.collection?
           attributes[attribute] != @synced_attributes[attribute]
@@ -248,6 +256,7 @@ module ReactiveRecord
       if !data_loading?
         React::State.set_state(self, attribute, value)
       elsif current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
+        puts "not expecting to get here #{attribute}"
         after(0.001) { React::State.set_state(self, attribute, value) }
       end
       if empty_before != changed_attributes.empty?
@@ -357,6 +366,8 @@ module ReactiveRecord
       instance
     end
 
+    `console.log("apply_method location")`
+
     def apply_method(method, server_method_mode = nil)
       # Fills in the value returned by sending "method" to the corresponding server side db instance
       if !new?
@@ -370,6 +381,19 @@ module ReactiveRecord
             end
           elsif aggregation = @model.reflect_on_aggregation(method)
             new_from_vector(aggregation.klass, self, *vector, method)
+          elsif server_method_mode
+            if (id and id != "") and direct_val = self.class.fetch_from_db([@model, [:find, id], *method])
+              direct_val
+            elsif (!id or id == "") and direct_val = self.class.fetch_from_db([*vector, *method])
+              direct_val
+            else
+              dummy_val = self.class.load_from_db(self, *vector, method)
+              if @attributes.has_key?(method)
+                @attributes[method]
+              else
+                dummy_val
+              end
+            end
           elsif id and id != ""
             self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(self, *vector, method)
           else  # its a attribute in an aggregate or we are on the client and don't know the id
