@@ -129,11 +129,15 @@ describe "integration with react" do
   end
 
   rendering("a record that is updated multiple times") do
-
-    @record ||= User.new
+    unless @record
+      @record = User.new
+      @record.attributes[:all_done] = false
+      @record.attributes[:test_done] = false
+      @record.attributes[:counter] = 0
+    end
     puts "rendering #{@record} #{@record.attributes[:counter]}"
     after(0.1) do
-      @record.counter = (@record.counter || 0) + 1 unless @record.test_done
+      @record.counter = @record.counter + 1 unless @record.test_done
     end
     puts "record.changed? #{!!@record.changed?}"
     after(1) do

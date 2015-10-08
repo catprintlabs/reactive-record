@@ -182,6 +182,7 @@ module ReactiveRecord
                     self
                   end
                 rescue Exception => e
+                  binding.pry if cache_item.value and cache_item.value != []
                   raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
                   representative
                 end

@@ -63,15 +63,19 @@ module ActiveRecord
     end
 
     def method_missing(name, *args, &block)
+      if name =~ /\!$/
+        name = name.gsub(/\!$/,"")
+        force_update = true
+      end
       if name =~ /_changed\?$/
         @backing_record.changed?(name.gsub(/_changed\?$/,""))
       elsif args.count == 1 && name =~ /=$/ && !block
         attribute_name = name.gsub(/=$/,"")
         @backing_record.reactive_set!(attribute_name, args[0])
       elsif args.count == 0 && !block
-        @backing_record.reactive_get!(name)
+        @backing_record.reactive_get!(name, force_update)
       elsif !block
-        @backing_record.reactive_get!([[name]+args], :initialize)
+        @backing_record.reactive_get!([[name]+args], force_update)
       else
         super
       end

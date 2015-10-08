@@ -377,8 +377,10 @@ module ReactiveRecord
             attributes.each do |key, value|
               if keys.include? key
                 record[key] = value
-              else
+              elsif record.respond_to? "#{key}="
                 record.send("#{key}=",value)
+              else
+                # TODO once reading schema.rb on client is implemented throw an error here
               end
             end
             record
@@ -400,7 +402,8 @@ module ReactiveRecord
 
         associations.each do |association|
           parent = reactive_records[association[:parent_id]]
-          parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true)
+          next unless parent
+          #parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true) remove this????
           if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
             puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
             aggregate = reactive_records[association[:child_id]]
@@ -469,7 +472,7 @@ module ReactiveRecord
       rescue Exception => e
         puts "exception #{e}"
         puts e.backtrace.join("\n")
-
+binding.pry
         if save
           {success: false, saved_models: saved_models, message: e.message}
         else

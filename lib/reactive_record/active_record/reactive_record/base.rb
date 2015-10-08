@@ -162,14 +162,14 @@ module ReactiveRecord
       @attributes
     end
 
-    def reactive_get!(attribute, server_method_mode = nil)
+    def reactive_get!(attribute, reload = nil)
       @virgin = false unless data_loading?
       unless @destroyed
         if @attributes.has_key? attribute
           attributes[attribute].notify if @attributes[attribute].is_a? DummyValue
-          apply_method(attribute, :force) if server_method_mode == :force
+          apply_method(attribute) if reload
         else
-          apply_method(attribute, server_method_mode)
+          apply_method(attribute)
         end
         React::State.get_state(self, attribute) unless data_loading?
         attributes[attribute]
@@ -255,12 +255,12 @@ module ReactiveRecord
       attributes[attribute] = value if args.count != 0
       if !data_loading?
         React::State.set_state(self, attribute, value)
-      elsif current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
+      elsif on_opal_client? and current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
         puts "not expecting to get here #{attribute}"
         after(0.001) { React::State.set_state(self, attribute, value) }
       end
       if empty_before != changed_attributes.empty?
-        React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?) unless data_loading?
+        React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?) unless on_opal_server? or data_loading?
         aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
       end
     end
@@ -366,40 +366,30 @@ module ReactiveRecord
       instance
     end
 
-    `console.log("apply_method location")`
-
-    def apply_method(method, server_method_mode = nil)
+    def apply_method(method)
       # Fills in the value returned by sending "method" to the corresponding server side db instance
+      if on_opal_server? and changed?
+        log("Warning fetching virtual attributes (#{model.name}.#{method}) during prerendering on a changed or new model is not implemented.", :warning)
+        # to implement this we would have to sync up any changes during prererendering with a set the cached models (see server_data_cache)
+        # right now server_data cache is read only, BUT we could change this.  However it seems like a tails case.  Why would we create or update
+        # a model during prerendering???
+      end
       if !new?
-        sync_attribute(
-          method,
-          if association = @model.reflect_on_association(method)
-            if association.collection?
-              Collection.new(association.klass, @ar_instance, association, *vector, method)
-            else
-              find_association(association, (id and id != "" and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
-            end
-          elsif aggregation = @model.reflect_on_aggregation(method)
-            new_from_vector(aggregation.klass, self, *vector, method)
-          elsif server_method_mode
-            if (id and id != "") and direct_val = self.class.fetch_from_db([@model, [:find, id], *method])
-              direct_val
-            elsif (!id or id == "") and direct_val = self.class.fetch_from_db([*vector, *method])
-              direct_val
-            else
-              dummy_val = self.class.load_from_db(self, *vector, method)
-              if @attributes.has_key?(method)
-                @attributes[method]
-              else
-                dummy_val
-              end
-            end
-          elsif id and id != ""
-            self.class.fetch_from_db([@model, [:find, id], method]) || self.class.load_from_db(self, *vector, method)
-          else  # its a attribute in an aggregate or we are on the client and don't know the id
-            self.class.fetch_from_db([*vector, method]) || self.class.load_from_db(self, *vector, method)
+        new_value = if association = @model.reflect_on_association(method)
+          if association.collection?
+            Collection.new(association.klass, @ar_instance, association, *vector, method)
+          else
+            find_association(association, (id and id != "" and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
           end
-        )
+        elsif aggregation = @model.reflect_on_aggregation(method)
+          new_from_vector(aggregation.klass, self, *vector, method)
+        elsif id and id != ""
+          self.class.fetch_from_db([@model, [:find, id], *method]) || self.class.load_from_db(self, *vector, method)
+        else  # its a attribute in an aggregate or we are on the client and don't know the id
+          self.class.fetch_from_db([*vector, *method]) || self.class.load_from_db(self, *vector, method)
+        end
+        new_value = @attributes[method] if new_value.is_a? DummyValue and @attributes.has_key?(method)
+        sync_attribute(method, new_value)
       elsif association = @model.reflect_on_association(method) and association.collection?
         @attributes[method] = Collection.new(association.klass, @ar_instance, association)
       elsif aggregation = @model.reflect_on_aggregation(method)
@@ -408,9 +398,10 @@ module ReactiveRecord
           backing_record.aggregate_owner = self
           backing_record.aggregate_attribute = method
         end
-      elsif server_method_mode
-        dummy_val = self.class.load_from_db(self, *vector, method)
-        @attributes[method] = dummy_val unless @attributes.has_key?(method)
+      elsif method != model.primary_key
+        new_value = self.class.load_from_db(self, *vector, method)
+        new_value = @attributes[method] if new_value.is_a? DummyValue and @attributes.has_key?(method)
+        sync_attribute(method, new_value)
       end
     end
 
