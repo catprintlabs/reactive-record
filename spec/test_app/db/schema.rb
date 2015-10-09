@@ -11,7 +11,7 @@
 #
 # It's strongly recommended that you check this file into your version control system.
 
-ActiveRecord::Schema.define(version: 20150917220236) do
+ActiveRecord::Schema.define(version: 20151009000111) do
 
   create_table "addresses", force: :cascade do |t|
     t.string   "street"
@@ -55,6 +55,8 @@ ActiveRecord::Schema.define(version: 20150917220236) do
     t.string   "address2_city"
     t.string   "address2_state"
     t.string   "address2_zip"
+    t.string   "data_string"
+    t.integer  "data_times"
   end
 
 end

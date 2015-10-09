@@ -182,7 +182,6 @@ module ReactiveRecord
                     self
                   end
                 rescue Exception => e
-                  binding.pry if cache_item.value and cache_item.value != []
                   raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
                   representative
                 end
@@ -219,7 +218,15 @@ module ReactiveRecord
               end
             else
               apply_method_to_cache(method, method) do |cache_item|
-                @preloaded_records[cache_item.absolute_vector + [method]] || cache_item.value.send(*method)
+                if preloaded_value = @preloaded_records[cache_item.absolute_vector + [method]]
+                  preloaded_value
+                elsif method.is_a? String and cache_item.value.class.respond_to?(:reflect_on_aggregation) and
+                aggregation = cache_item.value.class.reflect_on_aggregation(method.to_sym) and !(aggregation.klass < ActiveRecord::Base) and
+                cache_item.value.send(method)
+                  aggregation.mapping.collect { |attribute, accessor| cache_item.value[attribute] }
+                else
+                  cache_item.value.send(*method)
+                end
               end
             end
           end
@@ -297,6 +304,9 @@ module ReactiveRecord
             else
               target.backing_record.update_attribute([method], value.first)
             end
+          elsif target.class.respond_to?(:reflect_on_aggregation) and aggregation = target.class.reflect_on_aggregation(method) and
+          !(aggregation.klass < ActiveRecord::Base)
+            target.send "#{method}=", aggregation.deserialize(value.first)
           elsif value.is_a? Array
             target.send "#{method}=", value.first unless method == "id" # we handle ids first so things sync nicely
           elsif value.is_a? Hash and value[:id] and value[:id].first #and

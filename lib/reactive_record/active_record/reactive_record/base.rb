@@ -34,6 +34,7 @@ module ReactiveRecord
     attr_accessor :aggregate_attribute
     attr_accessor :destroyed
     attr_accessor :updated_during
+    attr_accessor :synced_attributes
 
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -204,10 +205,12 @@ module ReactiveRecord
               attributes[attribute].attributes[inverse_of] = nil
             end
           end
-        elsif aggregation = @model.reflect_on_aggregation(attribute)
+        elsif aggregation = @model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
 
-          unless attributes[attribute]
-            raise "unitialized aggregate attribute - should never happen"
+          if new?
+            attributes[attribute] ||= aggregation.klass.new
+          elsif !attributes[attribute]
+            raise "uninitialized aggregate attribute - should never happen"
           end
 
           aggregate_record = attributes[attribute].backing_record
@@ -229,7 +232,13 @@ module ReactiveRecord
 
     def update_attribute(attribute, *args)
       value = args[0]
-      @synced_attributes[attribute] = value if args.count != 0 and data_loading?
+      if args.count != 0 and data_loading?
+        if aggregation = model.reflect_on_aggregation(attribute) and !(aggregation.klass < ActiveRecord::Base)
+          @synced_attributes[attribute] = aggregation.deserialize(aggregation.serialize(value))
+        else
+          @synced_attributes[attribute] = value
+        end
+      end
       if @virgin
         attributes[attribute] = value if args.count != 0
         return
@@ -256,11 +265,11 @@ module ReactiveRecord
       if !data_loading?
         React::State.set_state(self, attribute, value)
       elsif on_opal_client? and current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
-        puts "not expecting to get here #{attribute}"
-        after(0.001) { React::State.set_state(self, attribute, value) }
+        #after(0.001) { React::State.set_state(self, attribute, value) }
+        React::State.set_state(self, attribute, value, true)
       end
       if empty_before != changed_attributes.empty?
-        React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?) unless on_opal_server? or data_loading?
+        React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?, true) unless on_opal_server? or data_loading?
         aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
       end
     end
@@ -281,16 +290,8 @@ module ReactiveRecord
 
     def sync!(hash = {})  # does NOT notify (see saved! for notification)
       @attributes.merge! hash
-      @synced_attributes = @attributes.dup
-      @synced_attributes.each do |key, value|
-        if value.is_a? Collection
-          @synced_attributes[key] = value.dup_for_sync
-        elsif aggregation = model.reflect_on_aggregation(key)
-          value.backing_record.sync!
-        elsif !model.reflect_on_association(key)
-          @synced_attributes[key] = JSON.parse(value.to_json)
-        end
-      end
+      @synced_attributes = {}
+      @synced_attributes.each { |attribute, value| sync_attribute(key, value) }
       @changed_attributes = []
       @saving = false
       @errors = nil
@@ -300,8 +301,21 @@ module ReactiveRecord
     end
 
     def sync_attribute(attribute, value)
+
       @synced_attributes[attribute] = attributes[attribute] = value
-      @synced_attributes[attribute] = value.dup if value.is_a? ReactiveRecord::Collection
+
+      #@synced_attributes[attribute] = value.dup if value.is_a? ReactiveRecord::Collection
+
+      if value.is_a? Collection
+        @synced_attributes[attribute] = value.dup_for_sync
+      elsif aggregation = model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
+        value.backing_record.sync!
+      elsif aggregation
+        @synced_attributes[attribute] = aggregation.deserialize(aggregation.serialize(value))
+      elsif !model.reflect_on_association(attribute)
+        @synced_attributes[attribute] = JSON.parse(value.to_json)
+      end
+
       @changed_attributes.delete(attribute)
       value
     end
@@ -381,7 +395,7 @@ module ReactiveRecord
           else
             find_association(association, (id and id != "" and self.class.fetch_from_db([@model, [:find, id], method, @model.primary_key])))
           end
-        elsif aggregation = @model.reflect_on_aggregation(method)
+        elsif aggregation = @model.reflect_on_aggregation(method) and (aggregation.klass < ActiveRecord::Base)
           new_from_vector(aggregation.klass, self, *vector, method)
         elsif id and id != ""
           self.class.fetch_from_db([@model, [:find, id], *method]) || self.class.load_from_db(self, *vector, method)
@@ -392,13 +406,16 @@ module ReactiveRecord
         sync_attribute(method, new_value)
       elsif association = @model.reflect_on_association(method) and association.collection?
         @attributes[method] = Collection.new(association.klass, @ar_instance, association)
-      elsif aggregation = @model.reflect_on_aggregation(method)
+      elsif aggregation = @model.reflect_on_aggregation(method) and (aggregation.klass < ActiveRecord::Base)
         @attributes[method] = aggregation.klass.new.tap do |aggregate|
           backing_record = aggregate.backing_record
           backing_record.aggregate_owner = self
           backing_record.aggregate_attribute = method
         end
-      elsif method != model.primary_key
+      elsif !aggregation and method != model.primary_key
+        unless @attributes.has_key?(method)
+          log("Warning: reading from new #{model.name}.#{method} before assignment.  Will fetch value from server.  This may not be what you expected!!", :warning)
+        end
         new_value = self.class.load_from_db(self, *vector, method)
         new_value = @attributes[method] if new_value.is_a? DummyValue and @attributes.has_key?(method)
         sync_attribute(method, new_value)

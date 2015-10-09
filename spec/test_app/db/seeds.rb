@@ -6,33 +6,33 @@ users = [
 
 users.each do |first_name, last_name, email|
   User.create({
-    first_name: first_name, last_name: last_name, email: email, 
+    first_name: first_name, last_name: last_name, email: email,
     address_street: "4348 Culver Road", address_city: "Rochester", address_state: "NY", address_zip: "14617"
-    } 
+    }
     #without_protection: true
   )
 end
 
 todo_items = [
   {
-    title: "a todo for mitch", 
-    description: "mitch has a big fat todo to do!", 
+    title: "a todo for mitch",
+    description: "mitch has a big fat todo to do!",
     user: User.find_by_email("mitch@catprint.com"),
     comments: [{user: User.find_by_email("adamg@catprint.com"), comment: "get it done mitch"}]
   },
   {
-    title: "another todo for mitch", 
-    description: "mitch has too many todos", 
+    title: "another todo for mitch",
+    description: "mitch has too many todos",
     user: User.find_by_email("mitch@catprint.com")
   },
   {
-    title: "do it again Todd", 
-    description: "Todd please do that great thing you did again", 
+    title: "do it again Todd",
+    description: "Todd please do that great thing you did again",
     user: User.find_by_email("todd@catprint.com")
   },
   {
-    title: "no user todo", 
-    description: "the description" 
+    title: "no user todo",
+    description: "the description"
   }
 ]
 

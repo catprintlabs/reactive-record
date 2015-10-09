@@ -5,7 +5,12 @@ require 'spec_helper'
 
 use_case "updating aggregations" do
 
-  first_it "is time to make a new user" do
+  first_it "is time to create a new user and add the address directly to it" do
+    React::IsomorphicHelpers.load_context
+    test { expect(User.new(address: Address.new(zip:12345)).address.zip).to eq(12345) }
+  end
+
+  now_it "is time to make a new user" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       User.find_by_first_name("Jon").id

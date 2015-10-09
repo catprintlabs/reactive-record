@@ -1,3 +1,21 @@
+class TestData
+
+  def initialize(string, times)
+    @string = string
+    @times = times
+  end
+
+  attr_accessor :string
+  attr_accessor :times
+
+  def big_string
+    puts "calling big_string #{string} * #{times}"
+    string * times
+  end
+
+end
+
+
 class User < ActiveRecord::Base
 
   def view_permitted?(attribute)
@@ -11,6 +29,8 @@ class User < ActiveRecord::Base
 
   composed_of :address,  :class_name => 'Address', :constructor => :compose, :mapping => Address::MAPPED_FIELDS.map {|f| ["address_#{f}", f] }
   composed_of :address2, :class_name => 'Address', :constructor => :compose, :mapping => Address::MAPPED_FIELDS.map {|f| ["address2_#{f}", f] }
+
+  composed_of :data, :class_name => 'TestData', :allow_nil => true, :mapping => [['data_string', 'string'], ['data_times', 'times']]
 
   def name
     "#{first_name} #{last_name}"

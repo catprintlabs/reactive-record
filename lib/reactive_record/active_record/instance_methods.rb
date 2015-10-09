@@ -9,6 +9,7 @@ module ActiveRecord
     end
 
     def initialize(hash = {})
+
       if hash.is_a? ReactiveRecord::Base
         @backing_record = hash
       else

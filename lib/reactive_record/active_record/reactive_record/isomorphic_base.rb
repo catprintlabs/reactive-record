@@ -262,8 +262,11 @@ module ReactiveRecord
               else
                 output_attributes[attribute] = nil
               end
-            elsif record.model.reflect_on_aggregation(attribute)
+            elsif aggregation = record.model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
               add_new_association.call record, attribute, value.backing_record
+            elsif aggregation
+              new_value = aggregation.serialize(value)
+              output_attributes[attribute] = new_value if record.changed?(attribute) or new_value != aggregation.serialize(record.synced_attributes[attribute])
             elsif record.changed?(attribute)
               output_attributes[attribute] = value
             end
@@ -368,33 +371,41 @@ module ReactiveRecord
         models.each do |model_to_save|
           attributes = model_to_save[:attributes]
           model = Object.const_get(model_to_save[:model])
-          id = attributes.delete(model.primary_key) # if we are saving existing model primary key value will be present
+          id = attributes.delete(model.primary_key) if model.respond_to? :primary_key # if we are saving existing model primary key value will be present
           vector = model_to_save[:vector]
           vector[0] = vector[0].constantize
-          record = find_record(model, id, vector, save)
-          reactive_records[model_to_save[:id]] = vectors[vector] = record and if record.id
+          reactive_records[model_to_save[:id]] = vectors[vector] = record = find_record(model, id, vector, save)
+          if record and record.respond_to?(:id) and record.id
+            # we have an already exising activerecord model
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
                 record[key] = value
+              elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key.to_sym) and !(aggregation.klass < ActiveRecord::Base)
+                aggregation.mapping.each_with_index do |pair, i|
+                  record[pair.first] = value[i]
+                end
               elsif record.respond_to? "#{key}="
                 record.send("#{key}=",value)
               else
                 # TODO once reading schema.rb on client is implemented throw an error here
               end
             end
-            record
-          else
+          elsif record
+            # either the model is new, or its not even an active record model
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
                 record[key] = value
-              else
+              elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key) and !(aggregation.klass < ActiveRecord::Base)
+                aggregation.mapping.each_with_index do |pair, i|
+                  record[pair.first] = value[i]
+                end
+              elsif key.to_s != "id"
                 record.send("#{key}=",value)
               end
             end
             new_models << record
-            record
           end
         end
 
@@ -472,7 +483,6 @@ module ReactiveRecord
       rescue Exception => e
         puts "exception #{e}"
         puts e.backtrace.join("\n")
-binding.pry
         if save
           {success: false, saved_models: saved_models, message: e.message}
         else
