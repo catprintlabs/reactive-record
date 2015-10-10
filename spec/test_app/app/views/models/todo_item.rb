@@ -17,4 +17,7 @@ class TodoItem < ActiveRecord::Base
 
   scope :find_string, ->(s) { where("title LIKE ? OR description LIKE ?", "%#{s}%", "%#{s}%") }
 
+  scope :active, -> { where("title LIKE '%mitch%' OR description LIKE '%mitch%'")}
+  scope :important, -> { where("title LIKE '%another%' OR description LIKE '%another%'")}
+
 end

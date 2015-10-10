@@ -13,6 +13,15 @@ use_case "can scope models" do
     end
   end
 
+  and_it "can apply multiple simple scopes" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      User.find_by_email("mitch@catprint.com").todo_items.active.important.first.title
+    end.then_test do |title|
+      expect(title).to be("another todo for mitch")
+    end
+  end
+
   and_it "can apply multiple scopes" do
     ReactiveRecord.load do
       User.find_by_email("mitch@catprint.com").todo_items.find_string("mitch").find_string("another").count

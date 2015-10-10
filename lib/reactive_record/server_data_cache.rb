@@ -182,6 +182,7 @@ module ReactiveRecord
                     self
                   end
                 rescue Exception => e
+                  #binding.pry if cache_item.value and cache_item.value != []
                   raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
                   representative
                 end
@@ -282,7 +283,6 @@ module ReactiveRecord
         if id_value = tree["id"] and id_value.is_a? Array
           target.id = id_value.first
         end
-
         tree.each do |method, value|
           method = JSON.parse(method) rescue method
           new_target = nil
@@ -313,6 +313,10 @@ module ReactiveRecord
             association = target.class.reflect_on_association(method)
             new_target = association.klass.find(value[:id].first)
             target.send "#{method}=", new_target
+          elsif !(target.class < ActiveRecord::Base)
+            new_target = target.send *method
+            # value is an array if scope returns nil, so we destroy the bogus record
+            new_target.destroy and new_target = nil if value.is_a? Array
           else
             new_target = target.send("#{method}=", target.send(method))
           end
