@@ -25,6 +25,18 @@ module ReactiveRecord
     @loads_pending = true
   end
 
+  def self.check_loads_pending
+    if @loads_pending
+      if Base.pending_fetches.count > 0
+        true
+      else  # this happens when for example loading foo.x results in somebody looking at foo.y while foo.y is still being loaded
+        ReactiveRecord::WhileLoading.loaded_at Base.last_fetch_at
+        ReactiveRecord::WhileLoading.quiet!
+        false
+      end
+    end
+  end
+
   def self.run_blocks_to_load(failure = nil)
     if @blocks_to_load
       blocks_to_load = @blocks_to_load
@@ -34,7 +46,7 @@ module ReactiveRecord
         @load_stack << @loads_pending
         @loads_pending = nil
         result = promise_and_block.last.call(failure)
-        if @loads_pending and !failure
+        if check_loads_pending and !failure
           @blocks_to_load << promise_and_block
         else
           promise_and_block.first.resolve result

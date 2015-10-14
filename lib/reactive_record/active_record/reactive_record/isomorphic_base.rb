@@ -179,6 +179,13 @@ module ReactiveRecord
       end
     end
 
+    class << self
+
+      attr_reader :pending_fetches
+      attr_reader :last_fetch_at
+
+    end
+
     def self.schedule_fetch
       @fetch_scheduled ||= after(0.01) do
         if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches otherwise this would never normally happen
@@ -257,13 +264,13 @@ module ReactiveRecord
             if association = record.model.reflect_on_association(attribute)
               if association.collection?
                 value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
-              elsif value
+              elsif !value.nil?
                 add_new_association.call record, attribute, value.backing_record
               else
                 output_attributes[attribute] = nil
               end
             elsif aggregation = record.model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
-              add_new_association.call record, attribute, value.backing_record
+              add_new_association.call record, attribute, value.backing_record unless value.nil?
             elsif aggregation
               new_value = aggregation.serialize(value)
               output_attributes[attribute] = new_value if record.changed?(attribute) or new_value != aggregation.serialize(record.synced_attributes[attribute])
@@ -373,7 +380,13 @@ module ReactiveRecord
           model = Object.const_get(model_to_save[:model])
           id = attributes.delete(model.primary_key) if model.respond_to? :primary_key # if we are saving existing model primary key value will be present
           vector = model_to_save[:vector]
-          vector[0] = vector[0].constantize
+          vector = [vector[0].constantize] + vector[1..-1].collect do |method|
+            if method.is_a?(Array) and method.first == "find_by_id"
+              ["find", method.last]
+            else
+              method
+            end
+          end
           reactive_records[model_to_save[:id]] = vectors[vector] = record = find_record(model, id, vector, save)
           if record and record.respond_to?(:id) and record.id
             # we have an already exising activerecord model
