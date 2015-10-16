@@ -28,8 +28,8 @@ describe "prerendering" do
         expect(mitch.address.zip).to eq("14617")
         expect(mitch.todo_items.find_string("mitch").first.title).to eq("a todo for mitch")
         expect(mitch.todo_items.first.commenters.first.email).to eq("adamg@catprint.com")
-        expect(mitch.expensive_math(13)).to eq(14)
-        expect(mitch.detailed_name).to eq("M. VanDuyn - mitch@catprint.com")
+        expect(mitch.expensive_math(13)).to eq(169)
+        expect(mitch.detailed_name).to eq("M. VanDuyn - mitch@catprint.com (2 todos)")
         # clear out everything before moving on otherwise the initial data screws up the next test
         `delete window.ReactiveRecordInitialData`
       end

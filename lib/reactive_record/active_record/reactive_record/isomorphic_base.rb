@@ -277,7 +277,7 @@ module ReactiveRecord
             elsif record.changed?(attribute)
               output_attributes[attribute] = value
             end
-          end if record.changed? || (record == record_being_saved && force)
+          end if record.new? || record.changed? || (record == record_being_saved && force)
           record_index += 1
         end
         [models, associations, backing_records]
@@ -374,6 +374,7 @@ module ReactiveRecord
         vectors = {}
         new_models = []
         saved_models = []
+        dont_save_list = []
 
         models.each do |model_to_save|
           attributes = model_to_save[:attributes]
@@ -406,6 +407,7 @@ module ReactiveRecord
             end
           elsif record
             # either the model is new, or its not even an active record model
+            dont_save_list << record unless save
             keys = record.attributes.keys
             attributes.each do |key, value|
               if keys.include? key
@@ -423,54 +425,64 @@ module ReactiveRecord
         end
 
         puts "!!!!!!!!!!!!!!attributes updated"
+        ActiveRecord::Base.transaction do
+          associations.each do |association|
+            parent = reactive_records[association[:parent_id]]
+            next unless parent
+            #parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true) remove this????
+            if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
+              puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+              aggregate = reactive_records[association[:child_id]]
+              dont_save_list << aggregate
+              current_attributes = parent.send(association[:attribute]).attributes
+              puts "current parent attributes = #{current_attributes}"
+              new_attributes = aggregate.attributes
+              puts "current child attributes = #{new_attributes}"
+              merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
+              puts "merged attributes = #{merged_attributes}"
+              aggregate.assign_attributes(merged_attributes)
+              puts "aggregate attributes after merge = #{aggregate.attributes}"
+              parent.send("#{association[:attribute]}=", aggregate)
+              puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
+              raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
+              puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
+              dont_save_list.delete(parent)
+              if false and parent.new?
+                parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]] if parent.new?
+                puts "updated"
+              else
+                puts "skipped"
+              end
+            else
+              puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+              dont_save_list.delete(parent)
+              puts "updated"
+            end
+          end if associations
 
-        associations.each do |association|
-          parent = reactive_records[association[:parent_id]]
-          next unless parent
-          #parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true) remove this????
-          if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
-            puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-            aggregate = reactive_records[association[:child_id]]
-            current_attributes = parent.send(association[:attribute]).attributes
-            puts "current parent attributes = #{current_attributes}"
-            new_attributes = aggregate.attributes
-            puts "current child attributes = #{new_attributes}"
-            merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
-            puts "merged attributes = #{merged_attributes}"
-            aggregate.assign_attributes(merged_attributes)
-            puts "aggregate attributes after merge = #{aggregate.attributes}"
-            parent.send("#{association[:attribute]}=", aggregate)
-            puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
-          elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
-            raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
-          elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
-            puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
-            puts "Skipped (should be done by belongs to)"
-          else
-            puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-            parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
-            puts "updated"
-          end
-        end if associations
+          puts "!!!!!!!!!!!!associations updated"
 
-        puts "!!!!!!!!!!!!associations updated"
+          #if true or save
 
-        if save
-
-          ActiveRecord::Base.transaction do
+  #        ActiveRecord::Base.transaction do
 
             has_errors = false
 
+            puts "ready to start saving... dont_save_list = #{dont_save_list}"
+
             saved_models = reactive_records.collect do |reactive_record_id, model|
               puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
-              if model.frozen?
+              if model and (model.frozen? or dont_save_list.include?(model))
                 puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
                 valid = model.valid?
                 puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
                 has_errors ||= (validate and !valid)
                 puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
                 [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
-              elsif !model.id or model.changed?
+              elsif model and (!model.id or model.changed?)
                 puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
                 saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
                 has_errors ||= !saved
@@ -482,16 +494,19 @@ module ReactiveRecord
 
             raise "Could not save all models" if has_errors
 
+#          end
+          if save
+
+            {success: true, saved_models: saved_models }
+
+          else
+
+            vectors.each { |vector, model| model.reload unless model.nil? or model.new_record? }
+            vectors
+
           end
 
-          {success: true, saved_models: saved_models }
-
-        else
-
-          vectors
-
         end
-
 
       rescue Exception => e
         puts "exception #{e}"

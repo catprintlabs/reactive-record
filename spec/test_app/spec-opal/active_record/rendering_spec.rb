@@ -110,6 +110,19 @@ describe "integration with react" do
     html == "a todo for mitch, another todo for mitch"
   end
 
+  rendering("only as many times as needed") do
+    times_up = React::State.get_state(self, "times_up")
+    @timer ||= after(0.5) { React::State.set_state(self, "times_up", "DONE")}
+    @count ||= 0
+    @count += 1
+    "#{times_up} #{@count.to_s} " + User.find_by_email("mitch@catprint.com").todo_items.collect do |todo|
+      todo.title
+    end.join(", ")
+  end.should_generate do
+    puts "trying again: #{html}"
+    html == "DONE 3 a todo for mitch, another todo for mitch"
+  end
+
   rendering("a belongs_to association from id") do
     TodoItem.find(1).user.email
   end.should_generate do
@@ -179,7 +192,7 @@ describe "integration with react" do
     User.find_by_email("mitch@catprint.com").detailed_name
   end.should_generate do
     puts "html = #{html}"
-    html == "R. VanDuyn - mitch@catprint.com"
+    html == "R. VanDuyn - mitch@catprint.com (2 todos)"
   end
 
   rendering("a server side value dynamically changed after first fetch from server") do
@@ -194,7 +207,7 @@ describe "integration with react" do
     User.find_by_email("mitch@catprint.com").detailed_name
   end.should_generate do
     puts "html = #{html}"
-    html == "R. VanDuyn - mitch@catprint.com"
+    html == "R. VanDuyn - mitch@catprint.com (2 todos)"
   end
 
 end

@@ -22,18 +22,21 @@ use_case "updating aggregations" do
   end
 
   now_it "has a blank address" do
-    test { expect(User.find_by_first_name("Jon").address.zip).to be_blank }
+    test { puts "doing the blank test"; expect(User.find_by_first_name("Jon").address.attributes[:zip]).to be_blank; puts "blank test passed" }
   end
 
   now_it "is time to update the address" do
     User.find_by_first_name("Jon").address.zip = "14609"
-    test { expect(User.find_by_first_name("Jon").address.zip).to eq("14609") }
+    test { puts "doing the update test"; expect(User.find_by_first_name("Jon").address.zip).to eq("14609"); puts "test passed" }
   end
 
   and_it "can be saved" do
     User.find_by_first_name("Jon").save.then do
+      puts "back from the save going to reload context"
       React::IsomorphicHelpers.load_context
+      puts "context reloaded, going to load up jon"
       ReactiveRecord.load do
+        puts "loading jon"
         User.find_by_first_name("Jon").address.zip
       end.then_test do |zip|
         expect(zip).to eq("14609")

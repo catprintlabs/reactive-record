@@ -106,9 +106,14 @@ module ReactiveRecord
         end
 
         def self.[](models, associations, vectors, acting_user)
-          cache = new(acting_user, ReactiveRecord::Base.save_records(models, associations, acting_user, false, false))
-          vectors.each { |vector| cache[*vector] }
-          cache.as_json
+          result = nil
+          ActiveRecord::Base.transaction do
+            cache = new(acting_user, ReactiveRecord::Base.save_records(models, associations, acting_user, false, false))
+            vectors.each { |vector| cache[*vector] }
+            result = cache.as_json
+            raise ActiveRecord::Rollback
+          end
+          result
         end
 
         def clear_requests
@@ -182,7 +187,7 @@ module ReactiveRecord
                     self
                   end
                 rescue Exception => e
-                  #binding.pry if cache_item.value and cache_item.value != []
+                  binding.pry if cache_item.value and cache_item.value != []
                   raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
                   representative
                 end
@@ -253,7 +258,7 @@ module ReactiveRecord
                 end
               elsif @ar_object.class < ActiveRecord::Base and children.is_a? Hash
                 @parent.as_hash({jsonize(method) => children.merge({
-                  :id => [@ar_object.id],
+                  :id => (method.is_a?(Array) && method.first == "new") ? [nil] : [@ar_object.id],
                   @ar_object.class.inheritance_column => [@ar_object[@ar_object.class.inheritance_column]],
                   })})
               elsif method == "*all"
@@ -323,6 +328,9 @@ module ReactiveRecord
           load_from_json(value, new_target) if new_target
         end
         #target.save if target.respond_to? :save
+rescue Exception => e
+  `debugger`
+  nil
       end
 
 

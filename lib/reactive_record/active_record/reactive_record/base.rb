@@ -189,16 +189,16 @@ module ReactiveRecord
             inverse_of = association.inverse_of
             inverse_association = association.klass.reflect_on_association(inverse_of)
             if inverse_association.collection?
-              if !value
-                attributes[attribute].attributes[inverse_of].delete(@ar_instance) if attributes[attribute]
+              if value.nil?
+                attributes[attribute].attributes[inverse_of].delete(@ar_instance) unless attributes[attribute].nil?
               elsif value.attributes[inverse_of]
                 value.attributes[inverse_of] << @ar_instance
               else
                 value.attributes[inverse_of] = Collection.new(@model, value, inverse_association)
                 value.attributes[inverse_of].replace [@ar_instance]
               end
-            elsif value
-              attributes[attribute].attributes[inverse_of] = nil if attributes[attribute]
+            elsif !value.nil?
+              attributes[attribute].attributes[inverse_of] = nil unless attributes[attribute].nil?
               value.attributes[inverse_of] = @ar_instance
               React::State.set_state(value.backing_record, inverse_of, @ar_instance) unless data_loading?
             elsif attributes[attribute]
@@ -260,15 +260,17 @@ module ReactiveRecord
       elsif !changed_attributes.include?(attribute)
         changed_attributes << attribute
       end
+      had_key = attributes.has_key? attribute
       current_value = attributes[attribute]
       attributes[attribute] = value if args.count != 0
       if !data_loading?
         React::State.set_state(self, attribute, value)
-      elsif on_opal_client? and current_value.loaded? and current_value != value  # this is to handle changes in already loaded server side methods
-        #after(0.001) { React::State.set_state(self, attribute, value) }
+      elsif on_opal_client? and had_key and current_value.loaded? and current_value != value and args.count > 0  # this is to handle changes in already loaded server side methods
+        puts "setting up delayed change for #{@ar_instance}.#{attribute} current: #{current_value} new: #{value}"
         React::State.set_state(self, attribute, value, true)
       end
       if empty_before != changed_attributes.empty?
+        puts "setting up delayed change on record" unless on_opal_server? or data_loading?
         React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?, true) unless on_opal_server? or data_loading?
         aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
       end
