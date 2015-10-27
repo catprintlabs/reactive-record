@@ -187,9 +187,11 @@ module ReactiveRecord
                     self
                   end
                 rescue Exception => e
-                  binding.pry if cache_item.value and cache_item.value != []
-                  raise "ReactiveRecord exception caught when applying #{method} to db objects #{e}" if cache_item.value and cache_item.value != []
-                  representative
+                  if cache_item.value and cache_item.value != []
+                    raise "ReactiveRecord exception caught when applying #{method} to db object #{cache_item.value}: #{e}"
+                  else
+                    representative
+                  end
                 end
               else
                 representative
@@ -314,8 +316,8 @@ module ReactiveRecord
             target.send "#{method}=", aggregation.deserialize(value.first)
           elsif value.is_a? Array
             target.send "#{method}=", value.first unless method == "id" # we handle ids first so things sync nicely
-          elsif value.is_a? Hash and value[:id] and value[:id].first #and
-            association = target.class.reflect_on_association(method)
+          elsif value.is_a? Hash and value[:id] and value[:id].first and association = target.class.reflect_on_association(method)
+            # not sure if its necessary to check the id above... is it possible to for the method to be an association but not have an id?
             new_target = association.klass.find(value[:id].first)
             target.send "#{method}=", new_target
           elsif !(target.class < ActiveRecord::Base)

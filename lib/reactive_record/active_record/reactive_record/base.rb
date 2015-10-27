@@ -35,6 +35,7 @@ module ReactiveRecord
     attr_accessor :destroyed
     attr_accessor :updated_during
     attr_accessor :synced_attributes
+    attr_accessor :virgin
 
     # While data is being loaded from the server certain internal behaviors need to change
     # for example records all record changes are synced as they happen.
@@ -86,7 +87,6 @@ module ReactiveRecord
         # and set the primary if we have one
         record.sync_attribute(model.primary_key, id) if id
       end
-
       # finally initialize and return the ar_instance
       record.ar_instance ||= infer_type_from_hash(model, record.attributes).new(record)
     end
@@ -214,6 +214,7 @@ module ReactiveRecord
           end
 
           aggregate_record = attributes[attribute].backing_record
+          aggregate_record.virgin = false
 
           if value
             value_attributes = value.backing_record.attributes

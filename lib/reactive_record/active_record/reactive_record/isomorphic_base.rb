@@ -475,7 +475,8 @@ module ReactiveRecord
 
             saved_models = reactive_records.collect do |reactive_record_id, model|
               puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
-              if model and (model.frozen? or dont_save_list.include?(model))
+              if model and (model.frozen? or dont_save_list.include?(model) or model.changed.include?(model.class.primary_key))
+                # the above check for changed including the private key happens if you have an aggregate that includes its own id
                 puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
                 valid = model.valid?
                 puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
