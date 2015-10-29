@@ -274,7 +274,7 @@ module ReactiveRecord
             elsif aggregation
               new_value = aggregation.serialize(value)
               output_attributes[attribute] = new_value if record.changed?(attribute) or new_value != aggregation.serialize(record.synced_attributes[attribute])
-            elsif record.changed?(attribute)
+            elsif record.new? or record.changed?(attribute)
               output_attributes[attribute] = value
             end
           end if record.new? || record.changed? || (record == record_being_saved && force)
@@ -416,7 +416,9 @@ module ReactiveRecord
                 aggregation.mapping.each_with_index do |pair, i|
                   record[pair.first] = value[i]
                 end
-              elsif key.to_s != "id"
+              elsif key.to_s != "id" and record.respond_to?("#{key}=")  # server side methods can get included and we won't be able to write them...
+                # for example if you have a server side method foo, that you "get" on a new record, then later that value will get sent to the server
+                # we should track better these server side methods so this does not happen
                 record.send("#{key}=",value)
               end
             end

@@ -64,7 +64,7 @@ module ActiveRecord
     def scope(name, body)
       singleton_class.send(:define_method, name) do | *args |
         args = (args.count == 0) ? name : [name, *args]
-        ReactiveRecord::Base.class_scopes(self)[name] ||= ReactiveRecord::Collection.new(self, nil, nil, self, args)
+        ReactiveRecord::Base.class_scopes(self)[args] ||= ReactiveRecord::Collection.new(self, nil, nil, self, args)
       end
       singleton_class.send(:define_method, "#{name}=") do |collection|
         ReactiveRecord::Base.class_scopes(self)[name] = collection
