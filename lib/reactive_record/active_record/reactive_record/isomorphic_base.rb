@@ -357,7 +357,7 @@ module ReactiveRecord
               object.send(method)
             end
           end
-          if id and (found.nil? or !(found.class <= model) or found.id != id)
+          if id and (found.nil? or !(found.class <= model) or found.id.to_s != id.to_s)
             raise "Inconsistent data sent to server - #{model.name}.find(#{id}) != [#{vector}]"
           end
           found

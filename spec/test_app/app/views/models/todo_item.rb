@@ -20,4 +20,8 @@ class TodoItem < ActiveRecord::Base
   scope :active, -> { where("title LIKE '%mitch%' OR description LIKE '%mitch%'")}
   scope :important, -> { where("title LIKE '%another%' OR description LIKE '%another%'")}
 
+  def virtual_user_first_name
+    user.first_name
+  end unless RUBY_ENGINE == 'opal'
+
 end
