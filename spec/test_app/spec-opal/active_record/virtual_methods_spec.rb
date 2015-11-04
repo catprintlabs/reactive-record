@@ -45,6 +45,16 @@ use_case "virtual attributes" do
     end.then_test { |virtual_answer| expect(virtual_answer).to eq("J. Schmoe - mitch@catprint.com (2 todos)") }
   end
 
+  and_it "can call a simple virtual method involving an existing record and a new record" do
+    React::IsomorphicHelpers.load_context
+    new_record = TodoItem.new
+    ReactiveRecord.load do
+      existing_record = User.find("1")
+      new_record.user = existing_record
+      new_record.virtual_user_first_name
+    end.then_test { |virtual_answer| expect(virtual_answer).to eq("Mitch") }
+  end
+
   and_it "can call a simple virtual method on a new model on the server with data and an updated association" do
     React::IsomorphicHelpers.load_context
     new_user = User.new

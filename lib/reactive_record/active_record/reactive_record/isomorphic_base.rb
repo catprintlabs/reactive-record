@@ -264,7 +264,7 @@ module ReactiveRecord
             if association = record.model.reflect_on_association(attribute)
               if association.collection?
                 value.each do |assoc|
-                  add_new_association.call(record, attribute, assoc.backing_record) if assoc.changed?(association.inverse_of) or assoc.new? 
+                  add_new_association.call(record, attribute, assoc.backing_record) if assoc.changed?(association.inverse_of) or assoc.new?
                 end
               elsif record.new? || record.changed?(attribute) || (record == record_being_saved && force)
                 if value.nil?
@@ -272,9 +272,6 @@ module ReactiveRecord
                 else
                   add_new_association.call record, attribute, value.backing_record
                 end
-              else
-                message = "#{record}.#{attribute} WAS NOT CHANGED"
-                `console.log(message)`
               end
             elsif aggregation = record.model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
               add_new_association.call record, attribute, value.backing_record unless value.nil?
@@ -364,7 +361,7 @@ module ReactiveRecord
               object.send(method)
             end
           end
-          if id and (found.nil? or !(found.class <= model) or found.id != id)
+          if id and (found.nil? or !(found.class <= model) or found.id.to_s != id.to_s)
             raise "Inconsistent data sent to server - #{model.name}.find(#{id}) != [#{vector}]"
           end
           found
