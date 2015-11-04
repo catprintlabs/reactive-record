@@ -263,11 +263,18 @@ module ReactiveRecord
           record.attributes.each do |attribute, value|
             if association = record.model.reflect_on_association(attribute)
               if association.collection?
-                value.each { |assoc| add_new_association.call record, attribute, assoc.backing_record }
-              elsif !value.nil?
-                add_new_association.call record, attribute, value.backing_record
+                value.each do |assoc|
+                  add_new_association.call(record, attribute, assoc.backing_record) if assoc.changed?(association.inverse_of) or assoc.new? 
+                end
+              elsif record.new? || record.changed?(attribute) || (record == record_being_saved && force)
+                if value.nil?
+                  output_attributes[attribute] = nil
+                else
+                  add_new_association.call record, attribute, value.backing_record
+                end
               else
-                output_attributes[attribute] = nil
+                message = "#{record}.#{attribute} WAS NOT CHANGED"
+                `console.log(message)`
               end
             elsif aggregation = record.model.reflect_on_aggregation(attribute) and (aggregation.klass < ActiveRecord::Base)
               add_new_association.call record, attribute, value.backing_record unless value.nil?
