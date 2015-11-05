@@ -1,6 +1,6 @@
 # Reactive Record
 
-#### reactive-record gives your active-record models on the client integrated with react.rb.
+#### reactive-record gives you active-record models on the client integrated with react.rb.
 
 *"So simple its almost magic" (Amazed developer)*
 
