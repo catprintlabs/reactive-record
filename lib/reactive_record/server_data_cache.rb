@@ -285,6 +285,9 @@ module ReactiveRecord
 
         if sorted_collection = tree["*all"]
           target.replace sorted_collection.collect { |id| target.proxy_association.klass.find(id) }
+          if tree["*all"].include? 1179346
+            #debug_some_more = true
+          end
         end
 
         if id_value = tree["id"] and id_value.is_a? Array
@@ -296,7 +299,17 @@ module ReactiveRecord
           if method == "*all"
             next # its already been processed above
           elsif !target
+            puts "target is nil, Processing a #{method}"
             load_from_json(value, Object.const_get(method))
+            puts "finished method = #{method}"
+            begin
+              puts `Opal.Components.OrderShow.$order_state().$jobs().$first().$backing_record().attributes["$[]"]("job_log_records").collection[0].$updated_at()`
+            rescue
+              puts "no job log record here"
+            end
+
+            #{}`debugger`
+            nil
           elsif method == "*count"
             target.instance_variable_set(:@count, value.first)
           elsif method.is_a? Integer or method =~ /^[0-9]+$/
@@ -328,6 +341,18 @@ module ReactiveRecord
             new_target = target.send("#{method}=", target.send(method))
           end
           load_from_json(value, new_target) if new_target
+        end
+        puts "tree = #{tree} target = #{target}, "
+        begin
+          puts `Opal.Components.OrderShow.$order_state().$jobs().$first().$backing_record().attributes["$[]"]("job_log_records").collection[0].$updated_at()`
+        rescue
+          puts "no job log record here"
+        end
+        if debug_some_more
+          puts "all methods applied to target (#{target})"
+                      puts `Opal.Components.OrderShow.$order_state().$jobs().$first().$backing_record().attributes["$[]"]("job_log_records").collection[0].$updated_at()` rescue nil
+          `debugger`
+          nil
         end
         #target.save if target.respond_to? :save
 rescue Exception => e

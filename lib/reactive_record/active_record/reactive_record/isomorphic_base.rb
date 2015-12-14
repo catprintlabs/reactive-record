@@ -200,6 +200,8 @@ module ReactiveRecord
             log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
             begin
               ReactiveRecord::Base.load_from_json(response.json)
+              `debugger`
+              nil
             rescue Exception => e
               log("Unexpected exception raised while loading json from server: #{e}", :error)
             end
