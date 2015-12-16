@@ -1,7 +1,8 @@
 users = [
   ["Mitch", "VanDuyn", "mitch@catprint.com"],
   ["Todd", "Russell", "todd@catprint.com"],
-  ["Adam", "George", "adamg@catprint.com"]
+  ["Adam", "George", "adamg@catprint.com"],
+  ["Test1", "Test1", "test1@catprint.com"]
 ]
 
 users.each do |first_name, last_name, email|
@@ -33,6 +34,20 @@ todo_items = [
   {
     title: "no user todo",
     description: "the description"
+  },
+  {
+    title: "test 1 todo 1", description: "test 1 todo 1", user: User.find_by_email("test1@catprint.com"),
+    comments: [
+      {user: User.find_by_email("mitch@catprint.com"), comment: "test 1 todo 1 comment 1"},
+      {user: User.find_by_email("mitch@catprint.com"), comment: "test 1 todo 1 comment 2"}
+    ]
+  },
+  {
+    title: "test 1 todo 2", description: "test 1 todo 2", user: User.find_by_email("test1@catprint.com"),
+    comments: [
+      {user: User.find_by_email("mitch@catprint.com"), comment: "test 1 todo 2 comment 1"},
+      {user: User.find_by_email("mitch@catprint.com"), comment: "test 1 todo 2 comment 2"}
+    ]
   }
 ]
 

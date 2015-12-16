@@ -32,7 +32,7 @@ use_case "server loading edge cases" do
         todo.user && todo.user.first_name
       end.compact
     end.then_test do |first_names|
-      expect(first_names.count).to eq(3)
+      expect(first_names.count).to eq(5)
     end
   end
 
@@ -91,6 +91,19 @@ use_case "server loading edge cases" do
       end.then_test do |description|
         expect(description).to eq(descriptions[1])
       end
+    end
+  end
+
+  and_it "will load nested collections correctly" do
+    React::IsomorphicHelpers.load_context
+    ReactiveRecord.load do
+      User.find_by_email("test1@catprint.com").todo_items.collect do |todo|
+        todo.comments.collect do |comment|
+          comment.comment
+        end
+      end
+    end.then_test do | comments |
+      expect(comments).to eq([["test 1 todo 1 comment 1", "test 1 todo 1 comment 2"],["test 1 todo 2 comment 1", "test 1 todo 2 comment 2"]])
     end
   end
 

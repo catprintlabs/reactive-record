@@ -224,8 +224,6 @@ module ReactiveRecord
       {record.class.inheritance_column => record[record.class.inheritance_column]}
     end
 
-    # save records
-
     if RUBY_ENGINE == 'opal'
 
       def self.gather_records(records_to_process, force, record_being_saved)

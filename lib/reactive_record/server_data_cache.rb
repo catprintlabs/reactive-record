@@ -169,33 +169,63 @@ module ReactiveRecord
             db_cache << self
           end
 
-          def apply_method_to_cache(method, absolute_method, &block)
+          def apply_method_to_cache(method)
             @db_cache.inject(nil) do | representative, cache_item |
               if cache_item.vector == vector
                 if @ar_object.class < ActiveRecord::Base and @ar_object.attributes.has_key?(method)
                   @ar_object.check_permission_with_acting_user(acting_user, :view_permitted?, method)
                 end
-                begin
-                  new_ar_object = yield cache_item
-                  cache_item.clone.instance_eval do
-                    @vector = @vector + [method]  # don't push it on since you need a new vector!
-                    @absolute_vector = @absolute_vector + [absolute_method]
-                    @ar_object = new_ar_object
-                    @db_cache << self
-                    @parent = cache_item
-                    @root = cache_item.root
-                    self
-                  end
-                rescue Exception => e
-                  if cache_item.value and cache_item.value != []
-                    raise "ReactiveRecord exception caught when applying #{method} to db object #{cache_item.value}: #{e}"
+                if method == "*"
+                  if cache_item.value && cache_item.value.length > 0
+                    i = -1
+                    cache_item.value.inject(representative) do | representative, ar_object |
+                      i += 1
+                      apply_method_to_cache_item(representative, cache_item, ar_object, method, "*#{i}")
+                    end
                   else
-                    representative
+                    apply_method_to_cache_item(representative, cache_item, [], method, method)
                   end
+                else
+                  apply_method_to_cache_item(representative, cache_item, nil, method, method)
                 end
               else
                 representative
               end
+            end
+          end
+
+          def apply_method_to_cache_item(representative, cache_item, value, method, absolute_method)
+            new_ar_object = if method == "*all"
+              cache_item.value.collect { |record| record.id }
+            elsif method == "*count"
+              cache_item.value.count
+            else
+              if preloaded_value = @preloaded_records[cache_item.absolute_vector + [absolute_method]]
+                preloaded_value
+              elsif value
+                value
+              elsif method.is_a? String and cache_item.value.class.respond_to?(:reflect_on_aggregation) and
+              (aggregation = cache_item.value.class.reflect_on_aggregation(method.to_sym)) and !(aggregation.klass < ActiveRecord::Base) and
+              cache_item.value.send(method)
+                aggregation.mapping.collect { |attribute, accessor| cache_item.value[attribute] }
+              else
+                cache_item.value.send(*method)
+              end
+            end
+            cache_item.clone.instance_eval do
+              @vector = @vector + [method]  # don't push it on since you need a new vector!
+              @absolute_vector = @absolute_vector + [absolute_method]
+              @ar_object = new_ar_object
+              @db_cache << self
+              @parent = cache_item
+              @root = cache_item.root
+              self
+            end
+          rescue Exception => e
+            if cache_item.value and cache_item.value != []
+              raise "ReactiveRecord exception caught when applying #{method} to db object #{cache_item.value}: #{e}"
+            else
+              representative
             end
           end
 
@@ -206,37 +236,14 @@ module ReactiveRecord
               method = "*"
             end
             new_vector = vector + [method]
-            @db_cache.detect { |cached_item| cached_item.vector == new_vector} || build_new_instances(method)
+            result = @db_cache.detect { |cached_item| cached_item.vector == new_vector} || apply_method_to_cache(method)
+            puts "done apply_method(#{method})"
+            result
           end
 
           def build_new_instances(method)
-            if method == "*all"
-              apply_method_to_cache("*all", "*all") { |cache_item| cache_item.value.collect { |record| record.id } }
-            elsif method == "*count"
-              apply_method_to_cache("*count", "*count") { |cache_item| cache_item.value.count }
-            elsif method == "*"
-              if @ar_object and @ar_object.length > 0
-                i = -1
-                @ar_object.inject(nil) do | value, record |  # just using inject so we will return the last value
-                  i += 1
-                  apply_method_to_cache(method, "*#{i}") { |cache_item| @preloaded_records[cache_item.absolute_vector + ["*#{i}"]] || record }
-                end
-              else
-                apply_method_to_cache(method, method) {[]}
-              end
-            else
-              apply_method_to_cache(method, method) do |cache_item|
-                if preloaded_value = @preloaded_records[cache_item.absolute_vector + [method]]
-                  preloaded_value
-                elsif method.is_a? String and cache_item.value.class.respond_to?(:reflect_on_aggregation) and
-                aggregation = cache_item.value.class.reflect_on_aggregation(method.to_sym) and !(aggregation.klass < ActiveRecord::Base) and
-                cache_item.value.send(method)
-                  aggregation.mapping.collect { |attribute, accessor| cache_item.value[attribute] }
-                else
-                  cache_item.value.send(*method)
-                end
-              end
-            end
+            puts "build_new_instances(method)"
+
           end
 
           def jsonize(method)
