@@ -94,12 +94,12 @@ module ReactiveRecord
 
       include React::Component
 
-      required_param :loading
-      required_param :loaded_children
-      required_param :loading_children
-      required_param :element_type
-      required_param :element_props
-      optional_param :display, default: ""
+      param :loading
+      param :loaded_children
+      param :loading_children
+      param :element_type
+      param :element_props
+      param :display, default: ""
 
       class << self
 
