@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    reactive-record (0.7.30)
+    reactive-record (0.7.31)
       opal-browser
       opal-rails
       rails (>= 3.2.13)

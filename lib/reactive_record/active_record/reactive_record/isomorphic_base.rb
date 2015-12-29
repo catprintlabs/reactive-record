@@ -187,7 +187,7 @@ module ReactiveRecord
     end
 
     def self.schedule_fetch
-      @fetch_scheduled ||= after(0.01) do
+      @fetch_scheduled ||= after(0) do
         if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches otherwise this would never normally happen
           last_fetch_at = @last_fetch_at
           pending_fetches = @pending_fetches.uniq

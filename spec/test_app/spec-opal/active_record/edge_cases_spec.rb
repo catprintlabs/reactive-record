@@ -36,6 +36,18 @@ use_case "server loading edge cases" do
     end
   end
 
+  and_it "reruns loads in order" do
+    React::IsomorphicHelpers.load_context
+    User.find_by_email("mitch@catprint.com").last_name
+    after(0.01) do
+      ReactiveRecord.load do
+        TodoItem.find_by_title("do it again Todd").description
+      end.then_test do |description|
+        expect(description).to eq("Todd please do that great thing you did again")
+      end
+    end
+  end
+
   and_it "will load the same record via two different methods" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
