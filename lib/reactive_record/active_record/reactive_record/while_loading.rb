@@ -11,7 +11,7 @@ module ReactiveRecord
     result = block.call
     if @loads_pending
       @blocks_to_load ||= []
-      @blocks_to_load << [promise, block]
+      @blocks_to_load << [Base.last_fetch_at, promise, block]
     else
       promise.resolve result
     end
@@ -37,19 +37,20 @@ module ReactiveRecord
     end
   end
 
-  def self.run_blocks_to_load(failure = nil)
+  def self.run_blocks_to_load(fetch_id, failure = nil)
     if @blocks_to_load
-      blocks_to_load = @blocks_to_load
-      @blocks_to_load = []
+      blocks_to_load_now = @blocks_to_load.select { |data| data.first == fetch_id }
+      @blocks_to_load = @blocks_to_load.reject { |data| data.first == fetch_id }
       @load_stack ||= []
-      blocks_to_load.each do |promise_and_block|
+      blocks_to_load_now.each do |data|
+        id, promise, block = data
         @load_stack << @loads_pending
         @loads_pending = nil
-        result = promise_and_block.last.call(failure)
+        result = block.call(failure)
         if check_loads_pending and !failure
-          @blocks_to_load << promise_and_block
+          @blocks_to_load << [Base.last_fetch_at, promise, block]
         else
-          promise_and_block.first.resolve result
+          promise.resolve result
         end
         @loads_pending = @load_stack.pop
       end

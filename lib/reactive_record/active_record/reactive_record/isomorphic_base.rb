@@ -190,6 +190,7 @@ module ReactiveRecord
       @fetch_scheduled ||= after(0) do
         if @pending_fetches.count > 0  # during testing we might reset the context while there are pending fetches otherwise this would never normally happen
           last_fetch_at = @last_fetch_at
+          @last_fetch_at = Time.now
           pending_fetches = @pending_fetches.uniq
           models, associations = gather_records(@pending_records, false, nil)
           log(["Server Fetching: %o", pending_fetches.to_n])
@@ -205,16 +206,15 @@ module ReactiveRecord
             end
             log("       Processed in: #{(Time.now-fetch_time).to_i}s")
             log(["       Returned: %o", response.json.to_n])
-            ReactiveRecord.run_blocks_to_load
+            ReactiveRecord.run_blocks_to_load last_fetch_at
             ReactiveRecord::WhileLoading.loaded_at last_fetch_at
             ReactiveRecord::WhileLoading.quiet! if @pending_fetches.empty?
           end.fail do |response|
             log("Fetch failed", :error)
-            ReactiveRecord.run_blocks_to_load(response.body)
+            ReactiveRecord.run_blocks_to_load(last_fetch_at, response.body)
           end
           @pending_fetches = []
           @pending_records = []
-          @last_fetch_at = Time.now
           @fetch_scheduled = nil
         end
       end
