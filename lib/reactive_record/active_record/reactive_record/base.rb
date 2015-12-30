@@ -234,7 +234,7 @@ module ReactiveRecord
     def update_attribute(attribute, *args)
       value = args[0]
       if args.count != 0 and data_loading?
-        if aggregation = model.reflect_on_aggregation(attribute) and !(aggregation.klass < ActiveRecord::Base)
+        if (aggregation = model.reflect_on_aggregation(attribute)) and !(aggregation.klass < ActiveRecord::Base)
           @synced_attributes[attribute] = aggregation.deserialize(aggregation.serialize(value))
         else
           @synced_attributes[attribute] = value
@@ -245,12 +245,12 @@ module ReactiveRecord
         return
       end
       changed = if args.count == 0
-        if association = @model.reflect_on_association(attribute) and association.collection?
+        if (association = @model.reflect_on_association(attribute)) and association.collection?
           attributes[attribute] != @synced_attributes[attribute]
         else
           !attributes[attribute].backing_record.changed_attributes.empty?
         end
-      elsif association = @model.reflect_on_association(attribute) and association.collection?
+      elsif (association = @model.reflect_on_association(attribute)) and association.collection?
         value != @synced_attributes[attribute]
       else
         !@synced_attributes.has_key?(attribute) or @synced_attributes[attribute] != value
@@ -324,10 +324,10 @@ module ReactiveRecord
     end
 
     def revert
-      @attributes.each do |attribute, value|
+      @changed_attributes.each do |attribute|
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
+        @attributes.delete(attribute) unless @synced_attributes.has_key?(attribute)
       end
-      @attributes.delete_if { |attribute, value| !@synced_attributes.has_key?(attribute) }
       @changed_attributes = []
       @errors = nil
     end

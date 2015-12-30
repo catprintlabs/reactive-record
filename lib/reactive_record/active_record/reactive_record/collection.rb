@@ -93,6 +93,7 @@ module ReactiveRecord
       all << item unless all.include? item # does this use == if so we are okay...
       if backing_record and @owner and @association and inverse_of = @association.inverse_of and item.attributes[inverse_of] != @owner
         current_association = item.attributes[inverse_of]
+        backing_record.virgin = false unless backing_record.data_loading?
         backing_record.update_attribute(inverse_of, @owner)
         current_association.attributes[@association.attribute].delete(item) if current_association and current_association.attributes[@association.attribute]
         @owner.backing_record.update_attribute(@association.attribute) # forces a check if association contents have changed from synced values
