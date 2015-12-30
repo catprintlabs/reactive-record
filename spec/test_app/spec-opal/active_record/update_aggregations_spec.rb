@@ -75,4 +75,19 @@ use_case "updating aggregations" do
     end
   end
 
+  and_it "is time to assign a db model to an aggregate" do
+    address = Address.new({zip: "14622", city: "Rochester"})
+    address.save do
+      user = User.new
+      user.address = address
+      ReactiveRecord.load do
+        user.verify_zip
+      end.then do |value|
+        address.destroy.then_test do
+          expect(value).to eq("14622")
+        end
+      end
+    end
+  end
+
 end

@@ -50,4 +50,12 @@ class User < ActiveRecord::Base
     n*n
   end unless RUBY_ENGINE == 'opal'
 
+  # this is also used for remote calculation in the aggregate test
+
+  def verify_zip
+    if address.zip =~ /^\d{5}$/
+      address.zip
+    end
+  end unless RUBY_ENGINE == 'opal'
+
 end
