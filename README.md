@@ -1,5 +1,7 @@
 # Reactive Record
 
+[![Join the chat at https://gitter.im/catprintlabs/reactive-record](https://badges.gitter.im/Join%20Chat.svg)](https://gitter.im/catprintlabs/reactive-record?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+
 #### reactive-record gives you active-record models on the client integrated with react.rb.
 
 *"So simple its almost magic" (Amazed developer)*
