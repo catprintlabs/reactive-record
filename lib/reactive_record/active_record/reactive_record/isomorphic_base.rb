@@ -359,7 +359,7 @@ module ReactiveRecord
               object.send(method)
             end
           end
-          if id and (found.nil? or !(found.class <= model) or (!found.id.nil? and found.id.to_s != id.to_s))
+          if id and (found.nil? or !(found.class <= model) or (found.id and found.id.to_s != id.to_s))
             raise "Inconsistent data sent to server - #{model.name}.find(#{id}) != [#{vector}]"
           end
           found
@@ -506,7 +506,7 @@ module ReactiveRecord
 
           else
 
-            vectors.each { |vector, model| model.reload unless model.nil? or model.new_record? }
+            vectors.each { |vector, model| model.reload unless model.nil? or model.new_record? or model.frozen? }
             vectors
 
           end
