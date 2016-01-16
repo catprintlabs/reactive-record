@@ -116,9 +116,7 @@ module ReactiveRecord
         end
 
         def loaded_at(loaded_at)
-          puts "loaded_at started"
           React::State.set_state(self, :loaded_at, loaded_at)
-          puts "loaded_at done"
           @is_loading = false
         end
 

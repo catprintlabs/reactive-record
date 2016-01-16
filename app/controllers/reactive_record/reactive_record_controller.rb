@@ -11,8 +11,9 @@ module ReactiveRecord
         params[:pending_fetches],
         acting_user
       ]
+    rescue Exception => e
+      render json: {error: e.message, backtrace: e.backtrace}, status: 500
     end
-
 
     def save
       render :json => ReactiveRecord::Base.save_records(
@@ -22,6 +23,8 @@ module ReactiveRecord
         params[:validate],
         true
       )
+    rescue Exception => e
+      render json: {error: e.message, backtrace: e.backtrace}, status: 500
     end
 
     def destroy
@@ -31,6 +34,8 @@ module ReactiveRecord
         params[:vector],
         acting_user
       )
+    rescue Exception => e
+      render json: {error: e.message, backtrace: e.backtrace}, status: 500
     end
 
   end

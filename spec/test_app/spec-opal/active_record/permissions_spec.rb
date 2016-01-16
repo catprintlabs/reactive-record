@@ -29,7 +29,7 @@ use_case "checking permissions" do
       end
     end.then_test do |failure|
       set_acting_user "super-user"
-      expect(failure).to include("ReactiveRecord Access Violation")
+      expect(failure).to include("ReactiveRecord::AccessViolation")
     end
   end
 
@@ -64,7 +64,7 @@ use_case "checking permissions" do
       end
     end.then_test do |failure|
       set_acting_user "super-user"
-      expect(failure).to include("ReactiveRecord Access Violation")
+      expect(failure).to include("ReactiveRecord::AccessViolation")
     end
   end
 

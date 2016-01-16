@@ -44,6 +44,7 @@ else
   require "reactive_record/server_data_cache"
   require "reactive_record/active_record/reactive_record/isomorphic_base"
   require "reactive_record/serializers"
+  require "reactive_record/pry"
 
   Opal.append_path File.expand_path('../', __FILE__).untaint
   Opal.append_path File.expand_path('../../vendor', __FILE__).untaint

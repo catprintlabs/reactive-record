@@ -267,11 +267,9 @@ module ReactiveRecord
       if !data_loading?
         React::State.set_state(self, attribute, value)
       elsif on_opal_client? and had_key and current_value.loaded? and current_value != value and args.count > 0  # this is to handle changes in already loaded server side methods
-        puts "setting up delayed change for #{@ar_instance}.#{attribute} current: #{current_value} new: #{value}"
         React::State.set_state(self, attribute, value, true)
       end
       if empty_before != changed_attributes.empty?
-        puts "setting up delayed change on record" unless on_opal_server? or data_loading?
         React::State.set_state(self, "!CHANGED!", !changed_attributes.empty?, true) unless on_opal_server? or data_loading?
         aggregate_owner.update_attribute(aggregate_attribute) if aggregate_owner
       end
