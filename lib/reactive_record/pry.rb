@@ -2,16 +2,10 @@ module ReactiveRecord
 
   module Pry
 
-    def self.rescue(&block)
-      if defined? PryRescue
-        ::Pry::rescue &block
-      else
-        block.call
-      end
-    end
-
     def self.rescued(e)
-      ::Pry::rescued(e) if defined?(PryRescue) && !e.is_a?(ReactiveRecord::AccessViolation)
+      if defined?(PryRescue) && e.instance_variable_defined?(:@rescue_bindings) && !e.is_a?(ReactiveRecord::AccessViolation)
+        ::Pry::rescued(e)
+      end
     end
 
   end

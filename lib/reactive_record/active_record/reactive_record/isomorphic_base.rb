@@ -371,154 +371,148 @@ module ReactiveRecord
       end
 
       def self.save_records(models, associations, acting_user, validate, save)
+        reactive_records = {}
+        vectors = {}
+        new_models = []
+        saved_models = []
+        dont_save_list = []
 
-        ReactiveRecord::Pry.rescue do
-          begin
-
-            reactive_records = {}
-            vectors = {}
-            new_models = []
-            saved_models = []
-            dont_save_list = []
-
-            models.each do |model_to_save|
-              attributes = model_to_save[:attributes]
-              model = Object.const_get(model_to_save[:model])
-              id = attributes.delete(model.primary_key) if model.respond_to? :primary_key # if we are saving existing model primary key value will be present
-              vector = model_to_save[:vector]
-              vector = [vector[0].constantize] + vector[1..-1].collect do |method|
-                if method.is_a?(Array) and method.first == "find_by_id"
-                  ["find", method.last]
-                else
-                  method
-                end
-              end
-              reactive_records[model_to_save[:id]] = vectors[vector] = record = find_record(model, id, vector, save)
-              if record and record.respond_to?(:id) and record.id
-                # we have an already exising activerecord model
-                keys = record.attributes.keys
-                attributes.each do |key, value|
-                  if keys.include? key
-                    record[key] = value
-                  elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key.to_sym) and !(aggregation.klass < ActiveRecord::Base)
-                    aggregation.mapping.each_with_index do |pair, i|
-                      record[pair.first] = value[i]
-                    end
-                  elsif record.respond_to? "#{key}="
-                    record.send("#{key}=",value)
-                  else
-                    # TODO once reading schema.rb on client is implemented throw an error here
-                  end
-                end
-              elsif record
-                # either the model is new, or its not even an active record model
-                dont_save_list << record unless save
-                keys = record.attributes.keys
-                attributes.each do |key, value|
-                  if keys.include? key
-                    record[key] = value
-                  elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key) and !(aggregation.klass < ActiveRecord::Base)
-                    aggregation.mapping.each_with_index do |pair, i|
-                      record[pair.first] = value[i]
-                    end
-                  elsif key.to_s != "id" and record.respond_to?("#{key}=")  # server side methods can get included and we won't be able to write them...
-                    # for example if you have a server side method foo, that you "get" on a new record, then later that value will get sent to the server
-                    # we should track better these server side methods so this does not happen
-                    record.send("#{key}=",value)
-                  end
-                end
-                new_models << record
-              end
-            end
-
-            #puts "!!!!!!!!!!!!!!attributes updated"
-            ActiveRecord::Base.transaction do
-              associations.each do |association|
-                parent = reactive_records[association[:parent_id]]
-                next unless parent
-                #parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true) remove this????
-                if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
-                  #puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-                  aggregate = reactive_records[association[:child_id]]
-                  dont_save_list << aggregate
-                  current_attributes = parent.send(association[:attribute]).attributes
-                  #puts "current parent attributes = #{current_attributes}"
-                  new_attributes = aggregate.attributes
-                  #puts "current child attributes = #{new_attributes}"
-                  merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
-                  #puts "merged attributes = #{merged_attributes}"
-                  aggregate.assign_attributes(merged_attributes)
-                  #puts "aggregate attributes after merge = #{aggregate.attributes}"
-                  parent.send("#{association[:attribute]}=", aggregate)
-                  #puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
-                elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
-                  raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
-                elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
-                  #puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
-                  dont_save_list.delete(parent)
-                  if false and parent.new?
-                    parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]] if parent.new?
-                    #puts "updated"
-                  else
-                    #puts "skipped"
-                  end
-                else
-                  #puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
-                  parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
-                  dont_save_list.delete(parent)
-                  #puts "updated"
-                end
-              end if associations
-
-              #puts "!!!!!!!!!!!!associations updated"
-
-              has_errors = false
-
-              #puts "ready to start saving... dont_save_list = #{dont_save_list}"
-
-              saved_models = reactive_records.collect do |reactive_record_id, model|
-                #puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
-                if model and (model.frozen? or dont_save_list.include?(model) or model.changed.include?(model.class.primary_key))
-                  # the above check for changed including the private key happens if you have an aggregate that includes its own id
-                  #puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
-                  valid = model.valid?
-                  #puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
-                  has_errors ||= (validate and !valid)
-                  #puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
-                  [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
-                elsif model and (!model.id or model.changed?)
-                  #puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
-                  saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
-                  has_errors ||= !saved
-                  messages = model.errors.messages if (validate and !saved) or (!validate and !model.valid?)
-                  #puts "saved complete errors = <#{!saved}>, #{messages} has_errors #{has_errors}"
-                  [reactive_record_id, model.class.name, model.attributes, messages]
-                end
-              end.compact
-
-              raise "Could not save all models" if has_errors
-
-              if save
-
-                {success: true, saved_models: saved_models }
-
-              else
-
-                vectors.each { |vector, model| model.reload unless model.nil? or model.new_record? or model.frozen? }
-                vectors
-
-              end
-
-            end
-
-          rescue Exception => e
-            ReactiveRecord::Pry.rescued(e)
-            if save
-              {success: false, saved_models: saved_models, message: e}
+        models.each do |model_to_save|
+          attributes = model_to_save[:attributes]
+          model = Object.const_get(model_to_save[:model])
+          id = attributes.delete(model.primary_key) if model.respond_to? :primary_key # if we are saving existing model primary key value will be present
+          vector = model_to_save[:vector]
+          vector = [vector[0].constantize] + vector[1..-1].collect do |method|
+            if method.is_a?(Array) and method.first == "find_by_id"
+              ["find", method.last]
             else
-              {}
+              method
             end
           end
+          reactive_records[model_to_save[:id]] = vectors[vector] = record = find_record(model, id, vector, save)
+          if record and record.respond_to?(:id) and record.id
+            # we have an already exising activerecord model
+            keys = record.attributes.keys
+            attributes.each do |key, value|
+              if keys.include? key
+                record[key] = value
+              elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key.to_sym) and !(aggregation.klass < ActiveRecord::Base)
+                aggregation.mapping.each_with_index do |pair, i|
+                  record[pair.first] = value[i]
+                end
+              elsif record.respond_to? "#{key}="
+                record.send("#{key}=",value)
+              else
+                # TODO once reading schema.rb on client is implemented throw an error here
+              end
+            end
+          elsif record
+            # either the model is new, or its not even an active record model
+            dont_save_list << record unless save
+            keys = record.attributes.keys
+            attributes.each do |key, value|
+              if keys.include? key
+                record[key] = value
+              elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key) and !(aggregation.klass < ActiveRecord::Base)
+                aggregation.mapping.each_with_index do |pair, i|
+                  record[pair.first] = value[i]
+                end
+              elsif key.to_s != "id" and record.respond_to?("#{key}=")  # server side methods can get included and we won't be able to write them...
+                # for example if you have a server side method foo, that you "get" on a new record, then later that value will get sent to the server
+                # we should track better these server side methods so this does not happen
+                record.send("#{key}=",value)
+              end
+            end
+            new_models << record
+          end
+        end
+
+        #puts "!!!!!!!!!!!!!!attributes updated"
+        ActiveRecord::Base.transaction do
+          associations.each do |association|
+            parent = reactive_records[association[:parent_id]]
+            next unless parent
+            #parent.instance_variable_set("@reactive_record_#{association[:attribute]}_changed", true) remove this????
+            if parent.class.reflect_on_aggregation(association[:attribute].to_sym)
+              #puts ">>>>>>AGGREGATE>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+              aggregate = reactive_records[association[:child_id]]
+              dont_save_list << aggregate
+              current_attributes = parent.send(association[:attribute]).attributes
+              #puts "current parent attributes = #{current_attributes}"
+              new_attributes = aggregate.attributes
+              #puts "current child attributes = #{new_attributes}"
+              merged_attributes = current_attributes.merge(new_attributes) { |k, current_attr, new_attr| aggregate.send("#{k}_changed?") ? new_attr : current_attr}
+              #puts "merged attributes = #{merged_attributes}"
+              aggregate.assign_attributes(merged_attributes)
+              #puts "aggregate attributes after merge = #{aggregate.attributes}"
+              parent.send("#{association[:attribute]}=", aggregate)
+              #puts "updated  is frozen? #{aggregate.frozen?}, parent attributes = #{parent.send(association[:attribute]).attributes}"
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).nil?
+              raise "Missing association :#{association[:attribute]} for #{parent.class.name}.  Was association defined on opal side only?"
+            elsif parent.class.reflect_on_association(association[:attribute].to_sym).collection?
+              #puts ">>>>>>>>>> #{parent.class.name}.send('#{association[:attribute]}') << #{reactive_records[association[:child_id]]})"
+              dont_save_list.delete(parent)
+              if false and parent.new?
+                parent.send("#{association[:attribute]}") << reactive_records[association[:child_id]] if parent.new?
+                #puts "updated"
+              else
+                #puts "skipped"
+              end
+            else
+              #puts ">>>>ASSOCIATION>>>> #{parent.class.name}.send('#{association[:attribute]}=', #{reactive_records[association[:child_id]]})"
+              parent.send("#{association[:attribute]}=", reactive_records[association[:child_id]])
+              dont_save_list.delete(parent)
+              #puts "updated"
+            end
+          end if associations
+
+          #puts "!!!!!!!!!!!!associations updated"
+
+          has_errors = false
+
+          #puts "ready to start saving... dont_save_list = #{dont_save_list}"
+
+          saved_models = reactive_records.collect do |reactive_record_id, model|
+            #puts "saving rr_id: #{reactive_record_id} model.object_id: #{model.object_id} frozen? <#{model.frozen?}>"
+            if model and (model.frozen? or dont_save_list.include?(model) or model.changed.include?(model.class.primary_key))
+              # the above check for changed including the private key happens if you have an aggregate that includes its own id
+              #puts "validating frozen model #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+              valid = model.valid?
+              #puts "has_errors before = #{has_errors}, validate= #{validate}, !valid= #{!valid}  (validate and !valid) #{validate and !valid}"
+              has_errors ||= (validate and !valid)
+              #puts "validation complete errors = <#{!valid}>, #{model.errors.messages} has_errors #{has_errors}"
+              [reactive_record_id, model.class.name, model.attributes,  (valid ? nil : model.errors.messages)]
+            elsif model and (!model.id or model.changed?)
+              #puts "saving #{model.class.name} #{model} (reactive_record_id = #{reactive_record_id})"
+              saved = model.check_permission_with_acting_user(acting_user, new_models.include?(model) ? :create_permitted? : :update_permitted?).save(validate: validate)
+              has_errors ||= !saved
+              messages = model.errors.messages if (validate and !saved) or (!validate and !model.valid?)
+              #puts "saved complete errors = <#{!saved}>, #{messages} has_errors #{has_errors}"
+              [reactive_record_id, model.class.name, model.attributes, messages]
+            end
+          end.compact
+
+          raise "Could not save all models" if has_errors
+
+          if save
+
+            {success: true, saved_models: saved_models }
+
+          else
+
+            vectors.each { |vector, model| model.reload unless model.nil? or model.new_record? or model.frozen? }
+            vectors
+
+          end
+
+        end
+
+      rescue Exception => e
+        ReactiveRecord::Pry.rescued(e)
+        if save
+          {success: false, saved_models: saved_models, message: e}
+        else
+          {}
         end
       end
 
@@ -567,25 +561,20 @@ module ReactiveRecord
     else
 
       def self.destroy_record(model, id, vector, acting_user)
-
-        ReactiveRecord::Pry.rescue do
-          begin
-            model = Object.const_get(model)
-            record = if id
-              model.find(id)
-            else
-              ServerDataCache.new(acting_user, {})[*vector]
-            end
-
-
-            record.check_permission_with_acting_user(acting_user, :destroy_permitted?).destroy
-            {success: true, attributes: {}}
-
-          rescue Exception => e
-            ReactiveRecord::Pry.rescued(e)
-            {success: false, record: record, message: e}
-          end
+        model = Object.const_get(model)
+        record = if id
+          model.find(id)
+        else
+          ServerDataCache.new(acting_user, {})[*vector]
         end
+
+
+        record.check_permission_with_acting_user(acting_user, :destroy_permitted?).destroy
+        {success: true, attributes: {}}
+
+      rescue Exception => e
+        ReactiveRecord::Pry.rescued(e)
+        {success: false, record: record, message: e}
       end
     end
   end
