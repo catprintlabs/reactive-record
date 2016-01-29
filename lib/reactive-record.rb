@@ -16,27 +16,6 @@ if RUBY_ENGINE == 'opal'
 
 else
 
-  module ::ActiveRecord
-    module Core
-      module ClassMethods
-        def inherited(child_class)
-          begin
-            file = Rails.root.join('app','models',"#{child_class.name.underscore}.rb").to_s rescue nil
-            begin
-              require file
-            rescue LoadError
-            end
-            # from active record:
-            child_class.initialize_find_by_cache
-          rescue
-          end
-          super
-        end
-      end
-    end
-  end
-
-
   require "opal"
   require "reactive_record/version"
   require "reactive_record/permissions"
