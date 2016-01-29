@@ -54,6 +54,7 @@ GEM
       execjs (~> 2.0)
     builder (3.2.2)
     byebug (6.0.2)
+    coderay (1.1.0)
     coffee-script-source (1.9.1.1)
     concurrent-ruby (1.0.0)
     connection_pool (2.2.0)
@@ -64,6 +65,7 @@ GEM
       activesupport (>= 4.1.0)
     hike (1.2.3)
     i18n (0.7.0)
+    interception (0.5)
     jquery-cookie-rails (1.3.1.1)
       railties (>= 3.2.0, < 5.0)
     jquery-rails (4.0.5)
@@ -76,6 +78,7 @@ GEM
       nokogiri (>= 1.5.9)
     mail (2.6.3)
       mime-types (>= 1.16, < 3)
+    method_source (0.8.2)
     mime-types (2.6.2)
     mini_portile (0.6.2)
     minitest (5.8.1)
@@ -103,6 +106,15 @@ GEM
     opal-rspec (0.4.3)
       opal (>= 0.7.0, < 0.9)
     paggio (0.2.6)
+    pry (0.10.3)
+      coderay (~> 1.1.0)
+      method_source (~> 0.8.1)
+      slop (~> 3.4)
+    pry-rails (0.3.4)
+      pry (>= 0.9.10)
+    pry-rescue (1.4.2)
+      interception (>= 0.5)
+      pry
     rack (1.6.4)
     rack-test (0.6.3)
       rack (>= 1.0)
@@ -160,6 +172,7 @@ GEM
       rspec-mocks (~> 3.3.0)
       rspec-support (~> 3.3.0)
     rspec-support (3.3.0)
+    slop (3.6.0)
     sourcemap (0.1.1)
     sprockets (3.5.2)
       concurrent-ruby (~> 1.0)
@@ -186,6 +199,8 @@ DEPENDENCIES
   jquery-cookie-rails
   opal (~> 0.8)
   opal-rails
+  pry-rails
+  pry-rescue
   rails
   react-rails (= 1.3.2)
   reactive-record!

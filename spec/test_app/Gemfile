@@ -9,3 +9,5 @@ gem 'rspec-rails'
 gem 'reactive-record', path: "../.."
 gem 'jquery-cookie-rails'
 gem 'byebug'
+gem 'pry-rails'
+gem 'pry-rescue'

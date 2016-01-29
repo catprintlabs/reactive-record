@@ -31,6 +31,8 @@ class User < ActiveRecord::Base
 
   composed_of :data, :class_name => 'TestData', :allow_nil => true, :mapping => [['data_string', 'string'], ['data_times', 'times']]
 
+  enum test_enum: [:yes, :no]
+  
   def name
     "#{first_name} #{last_name}"
   end

@@ -49,6 +49,10 @@ module ActiveRecord
       base_class.instance_eval {ReactiveRecord::Base.find(self, opts.first.first, opts.first.last)}
     end
 
+    def enum(*args)
+      # when we implement schema validation we should also implement value checking
+    end
+
     def method_missing(name, *args, &block)
       if args.count == 1 && name =~ /^find_by_/ && !block
         find_by(name.gsub(/^find_by_/, "") => args[0])

@@ -370,6 +370,10 @@ module ReactiveRecord
         end
       end
 
+      def self.is_enum?(record, key)
+        record.class.respond_to?(:defined_enums) && record.class.defined_enums[key]
+      end
+
       def self.save_records(models, associations, acting_user, validate, save)
         reactive_records = {}
         vectors = {}
@@ -394,7 +398,9 @@ module ReactiveRecord
             # we have an already exising activerecord model
             keys = record.attributes.keys
             attributes.each do |key, value|
-              if keys.include? key
+              if is_enum?(record, key)
+                record.send("#{key}=",value)
+              elsif keys.include? key
                 record[key] = value
               elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key.to_sym) and !(aggregation.klass < ActiveRecord::Base)
                 aggregation.mapping.each_with_index do |pair, i|
@@ -411,7 +417,9 @@ module ReactiveRecord
             dont_save_list << record unless save
             keys = record.attributes.keys
             attributes.each do |key, value|
-              if keys.include? key
+              if is_enum?(record, key)
+                record.send("#{key}=",value)
+              elsif keys.include? key
                 record[key] = value
               elsif !value.nil? and aggregation = record.class.reflect_on_aggregation(key) and !(aggregation.klass < ActiveRecord::Base)
                 aggregation.mapping.each_with_index do |pair, i|
