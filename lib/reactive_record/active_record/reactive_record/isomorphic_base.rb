@@ -316,7 +316,10 @@ module ReactiveRecord
                   end
                 end
 
-                response.json[:saved_models].each { | item | backing_records[item[0]].errors! item[3] }
+                response.json[:saved_models].each do | item |
+                  backing_records[item[0]].sync_scopes
+                  backing_records[item[0]].errors! item[3]
+                end
 
                 yield response.json[:success], response.json[:message], response.json[:models]  if block
                 promise.resolve response.json
@@ -546,6 +549,7 @@ module ReactiveRecord
 
         if !data_loading? and (id or vector)
           HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: ar_instance.model_name, id: id, vector: vector}).then do |response|
+            sync_scopes
             yield response.json[:success], response.json[:message] if block
             promise.resolve response.json
           end

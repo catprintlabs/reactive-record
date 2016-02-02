@@ -27,6 +27,7 @@ module ReactiveRecord
     end
 
     def all
+      observed
       @dummy_collection.notify if @dummy_collection
       unless @collection
         @collection = []
@@ -43,7 +44,7 @@ module ReactiveRecord
     end
 
     def [](index)
-
+      observed
       if (@collection || all).length <= index and @dummy_collection
         (@collection.length..index).each do |i|
           new_dummy_record = ReactiveRecord::Base.new_from_vector(@target_klass, nil, *@vector, "*#{i}")
@@ -55,6 +56,9 @@ module ReactiveRecord
     end
 
     def ==(other_collection)
+      observed
+      return nil unless other_collection.is_a? Collection
+      other_collection.observed
       my_collection = (@collection || []).select { |target| target != @dummy_record }
       other_collection = (other_collection ? (other_collection.collection || []) : []).select { |target| target != other_collection.dummy_record }
       my_collection == other_collection
@@ -68,6 +72,7 @@ module ReactiveRecord
     end
 
     def count
+      observed
       if @collection
         @collection.count
       elsif @count ||= ReactiveRecord::Base.fetch_from_db([*@vector, "*count"])
@@ -89,6 +94,7 @@ module ReactiveRecord
     end
 
     def <<(item)
+      return delete(item) if item.destroyed? # pushing a destroyed item is the same as removing it
       backing_record = item.backing_record
       all << item unless all.include? item # does this use == if so we are okay...
       if backing_record and @owner and @association and inverse_of = @association.inverse_of and item.attributes[inverse_of] != @owner
@@ -104,7 +110,7 @@ module ReactiveRecord
         @dummy_record = @collection.detect { |r| r.backing_record.vector.last =~ /^\*[0-9]+$/ }
         @dummy_collection = nil
       end
-      self
+      notify_of_change
     end
 
     [:first, :last].each do |method|
@@ -141,11 +147,11 @@ module ReactiveRecord
         @dummy_collection = @dummy_record = nil
         new_array.each { |item| self << item }
       end
-      new_array
+      notify_of_change new_array
     end
 
     def delete(item)
-      if @owner and @association and inverse_of = @association.inverse_of
+      notify_of_change(if @owner and @association and inverse_of = @association.inverse_of
         if backing_record = item.backing_record and backing_record.attributes[inverse_of] == @owner
           # the if prevents double update if delete is being called from << (see << above)
           backing_record.update_attribute(inverse_of, nil)
@@ -153,7 +159,7 @@ module ReactiveRecord
         all.delete(item).tap { @owner.backing_record.update_attribute(@association.attribute) } # forces a check if association contents have changed from synced values
       else
         all.delete(item)
-      end
+      end)
     end
 
     def loading?
@@ -183,6 +189,19 @@ module ReactiveRecord
 
     def dummy_collection
       @dummy_collection
+    end
+
+    def notify_of_change(value = nil)
+begin
+      React::State.set_state(self, "collection", collection) unless ReactiveRecord::Base.data_loading?
+rescue Exception => e
+  `debugger`
+end
+      value
+    end
+
+    def observed
+      React::State.get_state(self, "collection") unless ReactiveRecord::Base.data_loading?
     end
 
   end
