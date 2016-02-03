@@ -132,9 +132,9 @@ module ActiveRecord
     def _react_param_conversion(param, opt = nil)
       # defines how react will convert incoming json to this ActiveRecord model
       #TIMING times = {start: Time.now.to_f, json_start: 0, json_end: 0, db_load_start: 0, db_load_end: 0}
-      param_is_native = !param.respond_to?(:is_a?) rescue true
       #TIMING times[:json_start] = Time.now.to_f
-      param = JSON.from_object param if param_is_native
+      param = Native(param)
+      param = JSON.from_object(param.to_n) if param.is_a? Native::Object
       #TIMING times[:json_end] = Time.now.to_f
       result = if param.is_a? self
         param
