@@ -119,4 +119,13 @@ use_case "server loading edge cases" do
     end
   end
 
+  and_it "will not fetch model.all when saving a new record to the model" do
+    React::IsomorphicHelpers.load_context
+    (new_record = User.new(email: "test22@catprint.com")).save do
+      new_record.destroy.then_test do
+        expect(ReactiveRecord::Base.class_scopes(User)[:all]).to be_nil
+      end
+    end
+  end
+
 end

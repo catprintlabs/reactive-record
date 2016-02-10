@@ -95,7 +95,7 @@ describe "updating scopes" do
   end
 
 
-  rendering("adding a new record will cause a re-render") do
+  rendering("saving a new record will update .all and cause a rerender") do
     puts "add record [#{@starting_count}]"
     unless @starting_count
       TodoItem.all.last.title

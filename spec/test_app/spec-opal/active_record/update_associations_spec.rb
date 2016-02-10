@@ -23,8 +23,11 @@ use_case "updating associations" do
 
   now_it "is time to give the user a todo" do
     jon = User.find_by_first_name("Jon")
-    jon.todo_items << (item = TodoItem.new({title: "Jon's first todo!"}))
-    test { expect(jon.todo_items.count).to be(1) }
+    result = (jon.todo_items << (item = TodoItem.new({title: "Jon's first todo!"})))
+    test do
+      expect(result).to be(jon.todo_items) 
+      expect(jon.todo_items.count).to be(1)
+    end
   end
 
   now_it "will save everything" do

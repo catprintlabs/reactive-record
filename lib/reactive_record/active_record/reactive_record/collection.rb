@@ -57,7 +57,7 @@ module ReactiveRecord
 
     def ==(other_collection)
       observed
-      return nil unless other_collection.is_a? Collection
+      return !@collection unless other_collection.is_a? Collection
       other_collection.observed
       my_collection = (@collection || []).select { |target| target != @dummy_record }
       other_collection = (other_collection ? (other_collection.collection || []) : []).select { |target| target != other_collection.dummy_record }
@@ -110,7 +110,7 @@ module ReactiveRecord
         @dummy_record = @collection.detect { |r| r.backing_record.vector.last =~ /^\*[0-9]+$/ }
         @dummy_collection = nil
       end
-      notify_of_change
+      notify_of_change self
     end
 
     [:first, :last].each do |method|
@@ -192,11 +192,7 @@ module ReactiveRecord
     end
 
     def notify_of_change(value = nil)
-begin
       React::State.set_state(self, "collection", collection) unless ReactiveRecord::Base.data_loading?
-rescue Exception => e
-  `debugger`
-end
       value
     end
 

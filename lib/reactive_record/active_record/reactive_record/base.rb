@@ -84,7 +84,7 @@ module ReactiveRecord
           end
         end
       end
-      model.all << @ar_instance
+      model.all << @ar_instance if ReactiveRecord::Base.class_scopes(model)[:all] # add this only if model.all has been fetched already
     end
 
     def self.find(model, attribute, value)
