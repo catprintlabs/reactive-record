@@ -129,6 +129,8 @@ module ActiveRecord
       define_method(method.to_s) { |*args, &block| }
     end
 
+    define_method('devise') { |*args| }
+
     def _react_param_conversion(param, opt = nil)
       # defines how react will convert incoming json to this ActiveRecord model
       #TIMING times = {start: Time.now.to_f, json_start: 0, json_end: 0, db_load_start: 0, db_load_end: 0}

@@ -1,7 +1,7 @@
 PATH
   remote: ../..
   specs:
-    reactive-record (0.7.40)
+    reactive-record (0.7.42)
       opal-browser
       opal-rails
       rails (>= 3.2.13)
@@ -52,12 +52,20 @@ GEM
     babel-transpiler (0.7.0)
       babel-source (>= 4.0, < 6)
       execjs (~> 2.0)
+    bcrypt (3.1.10)
     builder (3.2.2)
     byebug (6.0.2)
     coderay (1.1.0)
     coffee-script-source (1.9.1.1)
     concurrent-ruby (1.0.0)
     connection_pool (2.2.0)
+    devise (3.5.6)
+      bcrypt (~> 3.0)
+      orm_adapter (~> 0.1)
+      railties (>= 3.2.6, < 5)
+      responders
+      thread_safe (~> 0.1)
+      warden (~> 1.2.3)
     diff-lcs (1.2.5)
     erubis (2.7.0)
     execjs (2.6.0)
@@ -105,6 +113,7 @@ GEM
       rails (>= 3.2, < 5.0)
     opal-rspec (0.4.3)
       opal (>= 0.7.0, < 0.9)
+    orm_adapter (0.5.0)
     paggio (0.2.6)
     pry (0.10.3)
       coderay (~> 1.1.0)
@@ -155,6 +164,8 @@ GEM
       opal-activesupport (>= 0.2.0)
       opal-browser (= 0.2.0)
     ref (2.0.0)
+    responders (2.1.1)
+      railties (>= 4.2.0, < 5.1)
     rspec-core (3.3.2)
       rspec-support (~> 3.3.0)
     rspec-expectations (3.3.1)
@@ -190,12 +201,15 @@ GEM
     tilt (2.0.2)
     tzinfo (1.2.2)
       thread_safe (~> 0.1)
+    warden (1.2.6)
+      rack (>= 1.0)
 
 PLATFORMS
   ruby
 
 DEPENDENCIES
   byebug
+  devise
   jquery-cookie-rails
   opal (~> 0.8)
   opal-rails
@@ -207,6 +221,3 @@ DEPENDENCIES
   reactive-ruby
   rspec-rails
   sqlite3
-
-BUNDLED WITH
-   1.10.6
