@@ -196,7 +196,14 @@ module ReactiveRecord
           log(["Server Fetching: %o", pending_fetches.to_n])
           start_time = Time.now
           HTTP.post(`window.ReactiveRecordEnginePath`,
-          payload: {models: models, associations: associations, pending_fetches: pending_fetches}).then do |response|
+            payload: {
+              json: {
+                models:          models,
+                associations:    associations,
+                pending_fetches: pending_fetches
+              }.to_json
+            }
+          ).then do |response|
             fetch_time = Time.now
             log("       Fetched in:   #{(fetch_time-start_time).to_i}s")
             begin
@@ -301,7 +308,15 @@ module ReactiveRecord
 
             promise = Promise.new
 
-            HTTP.post(`window.ReactiveRecordEnginePath`+"/save", payload: {models: models, associations: associations, validate: validate}).then do |response|
+            HTTP.post(`window.ReactiveRecordEnginePath`+"/save",
+              payload: {
+                json: {
+                  models:       models,
+                  associations: associations,
+                  validate:     validate
+                }.to_json
+              }
+            ).then do |response|
               begin
                 response.json[:models] = response.json[:saved_models].collect do |item|
                   backing_records[item[0]].ar_instance
@@ -548,7 +563,15 @@ module ReactiveRecord
         promise = Promise.new
 
         if !data_loading? and (id or vector)
-          HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy", payload: {model: ar_instance.model_name, id: id, vector: vector}).then do |response|
+          HTTP.post(`window.ReactiveRecordEnginePath`+"/destroy",
+            payload: {
+              json: {
+                model:  ar_instance.model_name,
+                id:     id,
+                vector: vector
+              }.to_json
+            }
+          ).then do |response|
             sync_scopes
             yield response.json[:success], response.json[:message] if block
             promise.resolve response.json
