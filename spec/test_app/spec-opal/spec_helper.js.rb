@@ -1,8 +1,8 @@
 require 'opal'
 require 'opal-rspec'
 require 'reactive_record_config'
-require 'react_js_test_only'
-require 'reactive-ruby'
+require 'react' #_js_test_only'
+require 'reactrb'
 require 'reactive-record'
 require 'jquery'
 require 'opal-jquery'
@@ -168,8 +168,9 @@ module ReactTestHelpers
 
   def simulateEvent(event, element, params = {})
     simulator = Native(`ReactTestUtils.Simulate`)
-    element = `#{element.to_n}.getDOMNode` unless element.class == Element
-    simulator[event.to_s].call(element, params)
+    #element = `#{element.to_n}.getDOMNode` unless element.class == Element
+    simulator[event.to_s].call(element.dom_node, params)
+    #simulator[event.to_s].call(element, params)
   end
 
   def isElementOfType(element, type)
@@ -179,10 +180,13 @@ module ReactTestHelpers
   def build_element(type, options)
     component = React.create_element(type, options)
     element = `ReactTestUtils.renderIntoDocument(#{component.to_n})`
-    if `typeof React.findDOMNode === 'undefined'`
-      `$(element.getDOMNode())`          # v0.12
+
+    if !(`typeof ReactDOM === 'undefined' || typeof ReactDOM.findDOMNode === 'undefined'`)
+      `$(ReactDOM.findDOMNode(element))` # v0.14.0
+    elsif !(`typeof React.findDOMNode === 'undefined'`)
+      `$(React.findDOMNode(element))`    # v0.13.0
     else
-      `$(React.findDOMNode(element))`    # v0.13
+      `$(element.getDOMNode())`          # v0.12.0
     end
   end
 
@@ -204,6 +208,9 @@ module ReactTestHelpers
     component_class.after_update { check_block.call  }
     element = build_element component_class, opts
     check_block.call
+  rescue Exception => e
+    `debugger`
+    nil
   end
 
   def test(&block)

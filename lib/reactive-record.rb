@@ -1,6 +1,6 @@
 if RUBY_ENGINE == 'opal'
 
-  require "reactive-ruby"
+  require "reactrb"
   require "reactive_record/active_record/error"
   require "reactive_record/server_data_cache"
   require "reactive_record/active_record/reactive_record/while_loading"

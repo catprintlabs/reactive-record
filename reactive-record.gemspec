@@ -26,11 +26,11 @@ Gem::Specification.new do |s|
   s.add_development_dependency "sqlite3"
   s.add_development_dependency 'rspec-rails'
   s.add_development_dependency 'pry'
-  
+
   s.add_dependency "opal-rails"
   s.add_dependency "opal-browser"
   s.add_dependency 'react-rails'
   s.add_dependency 'therubyracer'
-  s.add_dependency 'reactive-ruby'
-  
+  s.add_dependency 'reactrb'
+
 end
