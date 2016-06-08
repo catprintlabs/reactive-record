@@ -3,10 +3,6 @@ require 'components/test'
 
 describe "prerendering" do
 
-  it "passes" do
-    expect(true).to be_truthy
-  end
-
   it "will not return an id before preloading" do
     React::IsomorphicHelpers.load_context
     expect(User.find_by_email("mitch@catprint.com").id).not_to eq(1)
@@ -17,7 +13,7 @@ describe "prerendering" do
     container = Element[Document.body].append('<div></div>').children.last
     complete = lambda do
       React::IsomorphicHelpers.load_context
-      run_async do
+      async do
         mitch = User.find_by_email("mitch@catprint.com")
         expect(mitch.id).to eq(1)
         expect(mitch.first_name).to eq("Mitch")
@@ -40,14 +36,13 @@ describe "prerendering" do
     container = Element[Document.body].append('<div></div>').children.last
     complete = lambda do
       React::IsomorphicHelpers.load_context
-      run_async do
+      async do
         expect(User.find_by_email("mitch@catprint.com").last_name.to_s).to eq("")
         # clear out everything before moving on otherwise there will be a pending load that screw up the next test
         `delete window.ReactiveRecordInitialData`
         React::IsomorphicHelpers.load_context
       end
     end
-    puts "*******loading before preload everything test container"
     `container.load('/test', complete)`
   end
 

@@ -1,157 +1,129 @@
 require 'spec_helper'
 
-use_case "creating and updating a record" do
+describe "creating and updating a record" do
 
-  first_it "make sure user does not exist" do
-    set_acting_user "super-user"
+  before(:all) do
     React::IsomorphicHelpers.load_context
-    ReactiveRecord.load do
-      user = User.find_by_first_name("Jon")
-      user && user.id
-    end.then_test do |id|
-      expect(id).to be_nil
-      React::IsomorphicHelpers.load_context
-    end
   end
 
-  now_it "can create a new record" do
+  it "can create a new record" do
     jon = User.new({first_name: "Jon", last_name: "Weaver"})
-    test do
-      expect(jon.attributes).to eq({first_name: "Jon", last_name: "Weaver"})
-    end
+    expect(jon.attributes).to eq({first_name: "Jon", last_name: "Weaver"})
   end
 
-  now_it "has no id" do
+  it "after creating it will have no id" do
     jon = User.find_by_first_name("Jon")
-    test { expect(jon.id).to be_nil }
+    expect(jon.id).to be_nil
   end
 
-  and_it "is new" do
+  it "after creating it will be new" do
     jon = User.find_by_first_name("Jon")
-    test { expect(jon).to be_new }
+    expect(jon).to be_new
   end
 
-  and_it "has been changed" do
+  it "after creating it will be changed" do
     jon = User.find_by_first_name("Jon")
-    test { expect(jon.changed?).to be_truthy }
+    expect(jon.changed?).to be_truthy
   end
 
-  and_it "can get server side attributes" do
+  it "it can calculate server side attributes before saving" do
     ReactiveRecord.load do
       User.find_by_first_name("Jon").detailed_name
-    end.then_test do |name|
+    end.then do |name|
       expect(name).to eq("J. Weaver")
     end
   end
 
-  and_it "can be saved" do
+  it "can be saved and will have an id" do
     jon = User.find_by_first_name("Jon")
-    jon.save.while_waiting { expect(jon.saving?).to be_truthy }
-    #jon.save.then_test { expect(true).to be_truthy }
-    #expect(jon.saving?).to be_truthy
+    jon.save.then { expect(jon.id).not_to be_nil }
   end
 
-  now_it "has an id" do
-    jon = User.find_by_first_name("Jon")
-    test { expect(jon.id).not_to be_nil }
-  end
-
-  and_it "is not saving" do
-    jon = User.find_by_first_name("Jon")
-    test { expect(jon.saving?).to be_falsy }
-  end
-
-  and_it "is not changed" do
-    jon = User.find_by_first_name("Jon")
-    test { expect(jon.changed?).to be_falsy }
-  end
-
-  and_it "can be reloaded" do
+  it "can be reloaded" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       User.find_by_first_name("Jon").last_name
-    end.then_test do |last_name|
+    end.then do |last_name|
       expect(last_name).to be("Weaver")
     end
   end
 
-  now_it "has an id" do
+  it "will still have an id" do
     jon = User.find_by_first_name("Jon")
-    test { expect(jon.id).not_to be_nil }
+    expect(jon.id).not_to be_nil
   end
 
-  and_it "can be updated and it will get new server side values before saving" do
+  it "can be updated and it will get new server side values before saving" do
     jon = User.find_by_last_name("Weaver")
     jon.email = "jonny@catprint.com"
     ReactiveRecord.load do
       jon.detailed_name
-    end.then_test do |detailed_name|
+    end.then do |detailed_name|
       expect(detailed_name).to eq("J. Weaver - jonny@catprint.com")
     end
   end
 
-  and_it "can be updated and but it won't see the new server side values" do
+  it "can be updated but it won't see the new server side values" do
     jon = User.find_by_last_name("Weaver")
     jon.email = "jon@catprint.com"
     ReactiveRecord.load do
       jon.detailed_name
-    end.then_test do |detailed_name|
+    end.then do |detailed_name|
       expect(detailed_name).to eq("J. Weaver - jonny@catprint.com")
     end
   end
 
-  and_it "but the bang method forces a refresh" do
+  it "but the bang method forces a refresh" do
     jon = User.find_by_last_name("Weaver")
     ReactiveRecord.load do
       jon.detailed_name! unless jon.detailed_name == "J. Weaver - jon@catprint.com"
       jon.detailed_name
-    end.then_test do |detailed_name|
+    end.then do |detailed_name|
       expect(detailed_name).to eq("J. Weaver - jon@catprint.com")
     end
   end
 
-  and_it "can be saved and will remember the new values" do
+  async "can be saved and will remember the new values" do
     jon = User.find_by_last_name("Weaver")
     jon.email = "jon@catprint.com"
     jon.save.then do
       React::IsomorphicHelpers.load_context
       ReactiveRecord.load do
         User.find_by_last_name("Weaver").email
-      end.then_test do |email|
-        expect(email).to be("jon@catprint.com")
+      end.then do |email|
+        async { expect(email).to be("jon@catprint.com") }
       end
     end
   end
 
-  and_it "can be deleted" do
+  it "can be deleted" do
     jon = User.find_by_last_name("Weaver")
-    jon.destroy.then_test { expect(jon.id).to be_nil }
+    jon.destroy.then { expect(jon.id).to be_nil }
   end
 
-  now_it "does not exist in the database" do
+  it "does not exist in the database" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       User.find_by_first_name("Jon").id
-    end.then_test do |id|
+    end.then do |id|
       expect(id).to be_nil
     end
   end
 
-  now_it "is time to test a one way writable attribute (might be used for a password - see the user model)" do
+  async "it can have a one way writable attribute (might be used for a password - see the user model)" do
     jon = User.new({name: "Jon Weaver"})
     jon.save.then do
       React::IsomorphicHelpers.load_context
       ReactiveRecord.load do
         User.find_by_last_name("Weaver").first_name
-      end.then_test do |first_name|
-        expect(first_name).to be("Jon")
+      end.then do |first_name|
+        async { expect(first_name).to be("Jon") }
       end
     end
   end
 
-  and_it "is time to delete it" do
-    jon = User.find_by_last_name("Weaver")
-    jon.destroy.then_test { expect(jon.id).to be_nil }
+  after(:all) do
+    User.find_by_last_name("Weaver").destroy
   end
 
 end
