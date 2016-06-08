@@ -10,10 +10,16 @@ require 'jquery.cookie'
 require 'models'
 
 
-#Opal::RSpec::Runner.autorun
 Document.ready? do
   `$.cookie('acting_user', null, { path: '/' })`
-  Opal::RSpec::Runner.autorun
+  Opal::RSpec::Runner.autorun rescue nil
+end
+
+def sequenced_asyncs?
+  return true
+  #Opal::RSpec::Runner.method_defined?(auto_run)
+  #ruby_version = RUBY_ENGINE_VERSION.split(".")
+  #ruby_version[0].to_i > 0 or ruby_version[1].to_i > 8
 end
 
 class Object
@@ -26,7 +32,9 @@ class Object
       it "test starting" do
         expect(true).to be_truthy
       end
-      opal_rspec_runners.reverse.each do |type, title, opts, block, promise|
+      runners = opal_rspec_runners
+      runners = runners.reverse unless sequenced_asyncs?
+      runners.each do |type, title, opts, block, promise|
         promise_to_resolve = last_promise
         async(title, opts) do
           promise.then do
@@ -42,8 +50,9 @@ class Object
           end
         end
         last_promise = promise
+        last_promise.resolve if sequenced_asyncs?
       end
-      last_promise.resolve
+    last_promise.resolve unless sequenced_asyncs?
     end
   end
 
@@ -60,7 +69,7 @@ module Opal
         end
 
         def self.resolve_current_promise
-          @current_promise.resolve if @current_promise
+          @current_promise.resolve if !sequenced_asyncs? && @current_promise
         rescue Exception => e
           raise "test structure error:  Usually this is caused by a use_case test that has only a first_it an no other tests.  Check the use_case that ran just before this one."
         end
@@ -208,14 +217,13 @@ module ReactTestHelpers
     component_class.after_update { check_block.call  }
     element = build_element component_class, opts
     check_block.call
-  rescue Exception => e
-    `debugger`
-    nil
   end
 
   def test(&block)
-    run_async &block
-    Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+    Promise.new.tap do |promise|
+      promise.then_test &block
+      promise.resolve
+    end
   end
 
   # for the permissions test
@@ -238,15 +246,22 @@ class Promise
   end
 
   def while_waiting(&block)
-    self.then do
-      Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+    if sequenced_asyncs?
+      self.then_test {Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async { expect(true).to be_truthy }}
+      block.call
+    else
+      self.then do
+        Opal::RSpec::AsyncHelpers::ClassMethods.resolve_current_promise
+      end
+      Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async &block
     end
-    Opal::RSpec::AsyncHelpers::ClassMethods.get_current_promise_test_instance.run_async &block
   end
 
 end
 
 RSpec.configure do |config|
+  config.run_all_when_everything_filtered = true
+  config.filter_run_including only: true
   config.include ReactTestHelpers
   config.before(:each) do
     `current_state = {}`

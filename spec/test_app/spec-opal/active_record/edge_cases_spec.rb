@@ -1,6 +1,4 @@
 require 'spec_helper'
-#require 'user'
-#require 'todo_item'
 
 describe "pending edge cases" do
   it "base and subclass both belong to same parent record"

@@ -1,7 +1,4 @@
 require 'spec_helper'
-#require 'user'
-#require 'todo_item'
-#require 'address'
 
 use_case "creating and updating a record" do
 
@@ -10,7 +7,7 @@ use_case "creating and updating a record" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       user = User.find_by_first_name("Jon")
-      (user and user.id).tap { |id| puts "got id = #{id}"}
+      user && user.id
     end.then_test do |id|
       expect(id).to be_nil
       React::IsomorphicHelpers.load_context
@@ -49,36 +46,31 @@ use_case "creating and updating a record" do
 
   and_it "can be saved" do
     jon = User.find_by_first_name("Jon")
-    puts "save test"
     jon.save.while_waiting { expect(jon.saving?).to be_truthy }
+    #jon.save.then_test { expect(true).to be_truthy }
+    #expect(jon.saving?).to be_truthy
   end
 
   now_it "has an id" do
     jon = User.find_by_first_name("Jon")
-    puts "id test"
     test { expect(jon.id).not_to be_nil }
   end
 
   and_it "is not saving" do
     jon = User.find_by_first_name("Jon")
-    puts "not saving test"
     test { expect(jon.saving?).to be_falsy }
   end
 
   and_it "is not changed" do
     jon = User.find_by_first_name("Jon")
-    puts "not changed test"
     test { expect(jon.changed?).to be_falsy }
   end
 
   and_it "can be reloaded" do
-    puts "reloadem test"
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
-      puts "loading it in reloadem test"
       User.find_by_first_name("Jon").last_name
     end.then_test do |last_name|
-      puts "testing reloadem test"
       expect(last_name).to be("Weaver")
     end
   end

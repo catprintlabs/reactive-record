@@ -1,7 +1,4 @@
 require 'spec_helper'
-#require 'user'
-#require 'todo_item'
-#require 'address'
 
 use_case "updating associations" do
 
@@ -25,7 +22,7 @@ use_case "updating associations" do
     jon = User.find_by_first_name("Jon")
     result = (jon.todo_items << (item = TodoItem.new({title: "Jon's first todo!"})))
     test do
-      expect(result).to be(jon.todo_items) 
+      expect(result).to be(jon.todo_items)
       expect(jon.todo_items.count).to be(1)
     end
   end
@@ -128,8 +125,8 @@ use_case "updating associations" do
 
   now_it "is time to create a todo that belongs to nobody" do
     nobodys_business = TodoItem.new({title: "round to it"})
-    nobodys_business.save.then_test do
-      expect(nobodys_business).to be_saved
+    nobodys_business.save.then_test do |saved|
+      expect(saved).to be_truthy
     end
   end
 

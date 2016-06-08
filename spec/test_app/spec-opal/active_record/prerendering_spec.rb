@@ -1,7 +1,4 @@
 require 'spec_helper'
-#require 'user'
-#require 'todo_item'
-#require 'address'
 require 'components/test'
 
 describe "prerendering" do
@@ -32,6 +29,7 @@ describe "prerendering" do
         expect(mitch.detailed_name).to eq("M. VanDuyn - mitch@catprint.com (2 todos)")
         # clear out everything before moving on otherwise the initial data screws up the next test
         `delete window.ReactiveRecordInitialData`
+        React::IsomorphicHelpers.load_context
       end
     end
     `container.load('/test', complete)`
@@ -45,9 +43,11 @@ describe "prerendering" do
       run_async do
         expect(User.find_by_email("mitch@catprint.com").last_name.to_s).to eq("")
         # clear out everything before moving on otherwise there will be a pending load that screw up the next test
+        `delete window.ReactiveRecordInitialData`
         React::IsomorphicHelpers.load_context
       end
     end
+    puts "*******loading before preload everything test container"
     `container.load('/test', complete)`
   end
 
