@@ -2,7 +2,7 @@ source "http://rubygems.org"
 gem "rails"
 gem 'sqlite3'
 gem 'react-rails', "1.3.3"
-gem 'reactrb', path: "../../../reactive-ruby", branch: "0-8-stable"
+gem 'reactrb'
 gem 'opal-rails', git: "https://github.com/reactrb/opal-rails.git"
 gem 'reactive-record', path: "../.."
 gem 'jquery-cookie-rails'
