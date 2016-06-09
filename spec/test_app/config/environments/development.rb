@@ -33,7 +33,10 @@ Dummy::Application.configure do
   config.assets.compress = false
 
   # Expands the lines which load the assets
-  config.assets.debug = true
-  
+  config.assets.debug = false #true
+
   config.eager_load = false
+
+  config.react.variant = :development
+  config.react.addons = true
 end

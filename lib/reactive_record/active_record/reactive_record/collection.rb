@@ -167,6 +167,10 @@ module ReactiveRecord
       @dummy_collection.loading?
     end
 
+    def empty?  # should be handled by method missing below, but opal-rspec does not deal well with method missing, so to test...
+      all.empty?
+    end
+
     def method_missing(method, *args, &block)
       if [].respond_to? method
         all.send(method, *args, &block)

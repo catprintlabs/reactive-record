@@ -1,76 +1,73 @@
 require 'spec_helper'
-#require 'user'
 
-use_case "simple record update and save" do
+describe "simple record update and save" do
 
-  first_it "can find mitch" do
+  it "can find an existing model" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       User.find_by_email("mitch@catprint.com").first_name
-    end.then_test do |first_name|
+    end.then do |first_name|
       expect(first_name).to be("Mitch")
     end
   end
 
-  and_it "doesn't find mitch changed" do
-    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_changed}
+  it "doesn't find the model changed" do
+    expect(User.find_by_email("mitch@catprint.com")).not_to be_changed
   end
 
-  and_it "knows mitch is not new" do
-    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_new}
+  it "the model is not new" do
+    expect(User.find_by_email("mitch@catprint.com")).not_to be_new
   end
 
-  and_it "doesn't find mitch saving" do
-    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_saving}
+  it "the model is not saving" do
+    expect(User.find_by_email("mitch@catprint.com")).not_to be_saving
   end
 
-  now_it "changes mitch to mitchell" do
+  it "an attribute can be changed" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.first_name = "Mitchell"
-    test {expect(mitch.first_name).to eq("Mitchell")}
+    expect(mitch.first_name).to eq("Mitchell")
   end
 
-  and_it "finds mitch to be changed"do
-    test {expect(User.find_by_email("mitch@catprint.com")).to be_changed}
+  it "and the attribute will be marked as changed"do
+    expect(User.find_by_email("mitch@catprint.com")).to be_changed
   end
 
-  now_it "saves mitch" do
+  it "saving? is true while the model is being saved" do
     mitch = User.find_by_email("mitch@catprint.com")
-    mitch.save.then_test {}
-    expect(mitch).to be_saving
+    mitch.save.then {}.tap { expect(mitch).to be_saving }
   end
 
-  and_it "finds mitch not be changed" do
-    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_changed}
+  it "after saving changed? will be false" do
+    expect(User.find_by_email("mitch@catprint.com")).not_to be_changed
   end
 
-  and_it "finds mitch not to be saving" do
-    test {expect(User.find_by_email("mitch@catprint.com")).not_to be_saving}
+  it "after saving saving? will be false" do
+    expect(User.find_by_email("mitch@catprint.com")).not_to be_saving
   end
 
-  now_it "reloads the record and finds the name is mitchell" do
+  it "the data has been persisted to the database" do
     React::IsomorphicHelpers.load_context
     ReactiveRecord.load do
       User.find_by_email("mitch@catprint.com").first_name
-    end.then_test do |first_name|
+    end.then do |first_name|
       expect(first_name).to eq("Mitchell")
     end
   end
 
-  now_it "changes the name back to mitch and saves it" do
+  it "after saving within the block saving? will be false" do
     mitchell = User.find_by_email("mitch@catprint.com")
     mitchell.first_name = "Mitch"
-    mitchell.save.then_test do
+    mitchell.save.then do
       expect(mitchell).not_to be_saving
     end
   end
 
-
-  now_it "changes the name back to mitchell and we check what is sent to the block" do
+  async "the save block receives the correct block parameters" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.first_name = "Mitchell"
     mitch.save do | success, message, models |
-      test do
+      async do
         expect(success).to be_truthy
         expect(message).to be_nil
         expect(models).to eq([mitch])
@@ -79,21 +76,21 @@ use_case "simple record update and save" do
     end
   end
 
-  now_it "changes the name back to mitch and we check what is sent to the promise" do
+  it "the save promise receives the response hash" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.first_name = "Mitch"
-    mitch.save.then_test do | response |
+    mitch.save.then do | response |
       expect(response[:success]).to be_truthy
       expect(response[:message]).to be_nil
       expect(response[:models]).to eq([mitch])
     end
   end
 
-  now_it "is time to test for validation error handling" do
+  async "the save will fail if validation fails" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.email = "mitch at catprint dot com"
     mitch.save do |success, message, models|
-      test do
+      async do
         expect(success).to be_falsy
         expect(message).to be_present
         expect(models).to eq([mitch])
@@ -101,33 +98,27 @@ use_case "simple record update and save" do
     end
   end
 
-  and_it "puts the errors in the errors object" do
+  it "validation errors are put in the errors object" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.email = "mitch at catprint dot com"
-    mitch.save do |success, message, models|
-      test do
-        expect(mitch.errors[:email]).to eq(["is invalid"])
-      end
+    mitch.save.then do |success, message, models|
+      expect(mitch.errors[:email]).to eq(["is invalid"])
     end
   end
 
-  and_it "marks the record as not saving" do
+  it "within the save block saving? is false if validation fails" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.email = "mitch at catprint dot com"
-    mitch.save do
-      test do
-        expect(mitch).not_to be_saving
-      end
+    mitch.save.then do
+      expect(mitch).not_to be_saving
     end
   end
 
-  and_it "is still changed" do
+  it "if validation fails changed? is still true" do
     mitch = User.find_by_email("mitch@catprint.com")
     mitch.email = "mitch at catprint dot com"
-    mitch.save do
-      test do
-        expect(mitch).to be_changed
-      end
+    mitch.save.then do
+      expect(mitch).to be_changed
     end
   end
 

@@ -158,7 +158,7 @@ module ReactiveRecord
         @waiting_on_resources = loading
         WhileLoading.add_style_sheet
         %x{
-          var node = #{@native}.getDOMNode();
+          var node = #{dom_node};
           $(node).children(':nth-child(-1n+'+#{loaded_children.count}+')').addClass('reactive_record_show_when_loaded');
           $(node).children(':nth-child(1n+'+#{loaded_children.count+1}+')').addClass('reactive_record_show_while_loading');
         }
@@ -240,7 +240,7 @@ module React
       # Fyi, the while_loading container is responsible for setting its own link to itself
 
       %x{
-        var node = #{@native}.getDOMNode();
+        var node = #{dom_node};
         if (!$(node).is('[data-reactive_record_enclosing_while_loading_container_id]')) {
           var while_loading_container = $(node).closest('[data-reactive_record_while_loading_container_id]')
           if (while_loading_container.length > 0) {
@@ -256,7 +256,7 @@ module React
 
       %x{
 
-        var node = #{@native}.getDOMNode();
+        var node = #{dom_node};
         var while_loading_container_id = $(node).attr('data-reactive_record_enclosing_while_loading_container_id');
         if (while_loading_container_id) {
           var while_loading_container = $('[data-reactive_record_while_loading_container_id='+while_loading_container_id+']');

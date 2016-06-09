@@ -1,16 +1,16 @@
-require 'reactive-ruby'
+require 'reactrb'
 
 class TodoItemComponent
-  
+
   include React::Component
-    
+
   required_param :todo
   backtrace :on
-  
+
   def render
-    div do     
+    div do
       "Title: #{todo.title}".br; "Description #{todo.description}".br; "User #{todo.user.name}"
     end
   end
-  
+
 end

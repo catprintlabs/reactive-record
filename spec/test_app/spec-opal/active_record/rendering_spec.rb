@@ -150,10 +150,12 @@ describe "integration with react" do
     end
     puts "rendering #{@record} #{@record.attributes[:counter]}"
     after(0.1) do
+      puts "update counter timer expired, @record.test_done = #{!!@record.test_done}"
       @record.counter = @record.counter + 1 unless @record.test_done
     end
     puts "record.changed? #{!!@record.changed?}"
-    after(1) do
+    after(2) do
+      puts "all done timer expired test should get done now!"
       @record.all_done = true
     end unless @record.changed?
     if @record.all_done
