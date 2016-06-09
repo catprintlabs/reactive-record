@@ -1,3 +1,3 @@
 module ReactiveRecord
-  VERSION = "0.7.43"
+  VERSION = "0.9.0"
 end
