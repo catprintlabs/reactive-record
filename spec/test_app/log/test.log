@@ -278,3 +278,76 @@ Connecting to database specified by database.yml
   [1m[35m (0.1ms)[0m  rollback transaction
   [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
   [1m[35m (0.0ms)[0m  rollback transaction
+  [1m[36m (82.2ms)[0m  [1mCREATE TABLE "addresses" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "street" varchar, "city" varchar, "state" varchar, "zip" varchar, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL) [0m
+  [1m[35m (81.6ms)[0m  CREATE TABLE "comments" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "user_id" integer, "todo_item_id" integer, "comment" varchar, "created_at" datetime, "updated_at" datetime) 
+  [1m[36m (58.3ms)[0m  [1mCREATE TABLE "todo_items" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "title" varchar, "description" text, "complete" boolean, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL, "user_id" integer, "comment_id" integer) [0m
+  [1m[35m (57.7ms)[0m  CREATE TABLE "users" ("id" INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, "first_name" varchar, "last_name" varchar, "email" varchar, "created_at" datetime NOT NULL, "updated_at" datetime NOT NULL, "address_street" varchar, "address_city" varchar, "address_state" varchar, "address_zip" varchar, "address_id" integer, "address2_street" varchar, "address2_city" varchar, "address2_state" varchar, "address2_zip" varchar, "data_string" varchar, "data_times" integer, "test_enum" integer) 
+  [1m[36m (61.5ms)[0m  [1mCREATE TABLE "schema_migrations" ("version" varchar NOT NULL) [0m
+  [1m[35m (0.1ms)[0m  select sqlite_version(*)
+  [1m[36m (99.8ms)[0m  [1mCREATE UNIQUE INDEX "unique_schema_migrations" ON "schema_migrations" ("version")[0m
+  [1m[35m (0.1ms)[0m  SELECT version FROM "schema_migrations"
+  [1m[36m (40.2ms)[0m  [1mINSERT INTO "schema_migrations" (version) VALUES ('20160129182544')[0m
+  [1m[35m (41.5ms)[0m  INSERT INTO "schema_migrations" (version) VALUES ('20150826142045')
+  [1m[36m (50.4ms)[0m  [1mINSERT INTO "schema_migrations" (version) VALUES ('20150828172008')[0m
+  [1m[35m (49.4ms)[0m  INSERT INTO "schema_migrations" (version) VALUES ('20150908184118')
+  [1m[36m (49.9ms)[0m  [1mINSERT INTO "schema_migrations" (version) VALUES ('20150729195556')[0m
+  [1m[35m (49.9ms)[0m  INSERT INTO "schema_migrations" (version) VALUES ('20150617134028')
+  [1m[36m (33.3ms)[0m  [1mINSERT INTO "schema_migrations" (version) VALUES ('20150617002932')[0m
+  [1m[35m (33.3ms)[0m  INSERT INTO "schema_migrations" (version) VALUES ('20150917220236')
+  [1m[36m (41.6ms)[0m  [1mINSERT INTO "schema_migrations" (version) VALUES ('20151009000111')[0m
+  [1m[35mActiveRecord::SchemaMigration Load (0.3ms)[0m  SELECT "schema_migrations".* FROM "schema_migrations"
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.2ms)[0m  INSERT INTO "users" ("first_name", "last_name", "email", "address_street", "address_city", "address_state", "address_zip", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)  [["first_name", "Mitch"], ["last_name", "VanDuyn"], ["email", "mitch@catprint.com"], ["address_street", "4348 Culver Road"], ["address_city", "Rochester"], ["address_state", "NY"], ["address_zip", "14617"], ["created_at", "2016-10-18 18:06:52.990597"], ["updated_at", "2016-10-18 18:06:52.990597"]]
+  [1m[36m (42.0ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.0ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "users" ("first_name", "last_name", "email", "address_street", "address_city", "address_state", "address_zip", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)[0m  [["first_name", "Todd"], ["last_name", "Russell"], ["email", "todd@catprint.com"], ["address_street", "4348 Culver Road"], ["address_city", "Rochester"], ["address_state", "NY"], ["address_zip", "14617"], ["created_at", "2016-10-18 18:06:53.036652"], ["updated_at", "2016-10-18 18:06:53.036652"]]
+  [1m[35m (48.6ms)[0m  commit transaction
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "users" ("first_name", "last_name", "email", "address_street", "address_city", "address_state", "address_zip", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)  [["first_name", "Adam"], ["last_name", "George"], ["email", "adamg@catprint.com"], ["address_street", "4348 Culver Road"], ["address_city", "Rochester"], ["address_state", "NY"], ["address_zip", "14617"], ["created_at", "2016-10-18 18:06:53.087362"], ["updated_at", "2016-10-18 18:06:53.087362"]]
+  [1m[36m (47.6ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.0ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "users" ("first_name", "last_name", "email", "address_street", "address_city", "address_state", "address_zip", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)[0m  [["first_name", "Test1"], ["last_name", "Test1"], ["email", "test1@catprint.com"], ["address_street", "4348 Culver Road"], ["address_city", "Rochester"], ["address_state", "NY"], ["address_zip", "14617"], ["created_at", "2016-10-18 18:06:53.136571"], ["updated_at", "2016-10-18 18:06:53.136571"]]
+  [1m[35m (48.6ms)[0m  commit transaction
+  [1m[36mUser Load (0.2ms)[0m  [1mSELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1[0m  [["email", "mitch@catprint.com"]]
+  [1m[35mUser Load (0.0ms)[0m  SELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1  [["email", "adamg@catprint.com"]]
+  [1m[36mUser Load (0.0ms)[0m  [1mSELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1[0m  [["email", "mitch@catprint.com"]]
+  [1m[35mUser Load (0.0ms)[0m  SELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1  [["email", "todd@catprint.com"]]
+  [1m[36mUser Load (0.0ms)[0m  [1mSELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1[0m  [["email", "test1@catprint.com"]]
+  [1m[35mUser Load (0.0ms)[0m  SELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1  [["email", "mitch@catprint.com"]]
+  [1m[36mUser Load (0.0ms)[0m  [1mSELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1[0m  [["email", "mitch@catprint.com"]]
+  [1m[35mUser Load (0.0ms)[0m  SELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1  [["email", "test1@catprint.com"]]
+  [1m[36mUser Load (0.0ms)[0m  [1mSELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1[0m  [["email", "mitch@catprint.com"]]
+  [1m[35mUser Load (0.0ms)[0m  SELECT  "users".* FROM "users" WHERE "users"."email" = ? LIMIT 1  [["email", "mitch@catprint.com"]]
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "todo_items" ("title", "description", "user_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)  [["title", "a todo for mitch"], ["description", "mitch has a big fat todo to do!"], ["user_id", 1], ["created_at", "2016-10-18 18:06:53.211893"], ["updated_at", "2016-10-18 18:06:53.211893"]]
+  [1m[36m (48.4ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.1ms)[0m  begin transaction
+  [1m[36mSQL (0.2ms)[0m  [1mINSERT INTO "comments" ("user_id", "comment", "todo_item_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["user_id", 3], ["comment", "get it done mitch"], ["todo_item_id", 1], ["created_at", "2016-10-18 18:06:53.267655"], ["updated_at", "2016-10-18 18:06:53.267655"]]
+  [1m[35m (50.6ms)[0m  commit transaction
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "todo_items" ("title", "description", "user_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)  [["title", "another todo for mitch"], ["description", "mitch has too many todos"], ["user_id", 1], ["created_at", "2016-10-18 18:06:53.320152"], ["updated_at", "2016-10-18 18:06:53.320152"]]
+  [1m[36m (48.6ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.1ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "todo_items" ("title", "description", "user_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["title", "do it again Todd"], ["description", "Todd please do that great thing you did again"], ["user_id", 2], ["created_at", "2016-10-18 18:06:53.370228"], ["updated_at", "2016-10-18 18:06:53.370228"]]
+  [1m[35m (40.2ms)[0m  commit transaction
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "todo_items" ("title", "description", "created_at", "updated_at") VALUES (?, ?, ?, ?)  [["title", "no user todo"], ["description", "the description"], ["created_at", "2016-10-18 18:06:53.411650"], ["updated_at", "2016-10-18 18:06:53.411650"]]
+  [1m[36m (40.3ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.0ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "todo_items" ("title", "description", "user_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["title", "test 1 todo 1"], ["description", "test 1 todo 1"], ["user_id", 4], ["created_at", "2016-10-18 18:06:53.453238"], ["updated_at", "2016-10-18 18:06:53.453238"]]
+  [1m[35m (40.6ms)[0m  commit transaction
+  [1m[36m (0.0ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "comments" ("user_id", "comment", "todo_item_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)  [["user_id", 1], ["comment", "test 1 todo 1 comment 1"], ["todo_item_id", 5], ["created_at", "2016-10-18 18:06:53.495033"], ["updated_at", "2016-10-18 18:06:53.495033"]]
+  [1m[36m (40.4ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.0ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "comments" ("user_id", "comment", "todo_item_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["user_id", 1], ["comment", "test 1 todo 1 comment 2"], ["todo_item_id", 5], ["created_at", "2016-10-18 18:06:53.536760"], ["updated_at", "2016-10-18 18:06:53.536760"]]
+  [1m[35m (40.3ms)[0m  commit transaction
+  [1m[36m (0.1ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "todo_items" ("title", "description", "user_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)  [["title", "test 1 todo 2"], ["description", "test 1 todo 2"], ["user_id", 4], ["created_at", "2016-10-18 18:06:53.578302"], ["updated_at", "2016-10-18 18:06:53.578302"]]
+  [1m[36m (40.5ms)[0m  [1mcommit transaction[0m
+  [1m[35m (0.0ms)[0m  begin transaction
+  [1m[36mSQL (0.1ms)[0m  [1mINSERT INTO "comments" ("user_id", "comment", "todo_item_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)[0m  [["user_id", 1], ["comment", "test 1 todo 2 comment 1"], ["todo_item_id", 6], ["created_at", "2016-10-18 18:06:53.620014"], ["updated_at", "2016-10-18 18:06:53.620014"]]
+  [1m[35m (40.4ms)[0m  commit transaction
+  [1m[36m (0.0ms)[0m  [1mbegin transaction[0m
+  [1m[35mSQL (0.1ms)[0m  INSERT INTO "comments" ("user_id", "comment", "todo_item_id", "created_at", "updated_at") VALUES (?, ?, ?, ?, ?)  [["user_id", 1], ["comment", "test 1 todo 2 comment 2"], ["todo_item_id", 6], ["created_at", "2016-10-18 18:06:53.661491"], ["updated_at", "2016-10-18 18:06:53.661491"]]
+  [1m[36m (40.6ms)[0m  [1mcommit transaction[0m
