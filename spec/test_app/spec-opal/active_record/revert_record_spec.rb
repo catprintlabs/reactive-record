@@ -52,6 +52,22 @@ describe "reverting records" do
     expect(adam).not_to be_changed
   end
 
+  it 'changes multiple attributes of Adam and then be reverted' do
+    ReactiveRecord.load do
+      @r ||= User.find_by_first_name("Adam")
+      @r.last_name
+      @r
+    end.then do |r|
+      r.first_name = 'adam'
+      r.last_name = 'george'
+      expect(r).to be_changed
+      r.revert
+      expect(r.first_name).to eq('Adam')
+      expect(r.last_name).to eq('George')
+      expect(r).not_to be_changed
+    end
+  end
+
   it "finds the todo is still changed" do
     expect(TodoItem.find_by_title("Adam is still not getting this todo")).to be_changed
   end

@@ -344,10 +344,11 @@ module ReactiveRecord
     end
 
     def revert
-      @changed_attributes.each do |attribute|
+      @changed_attributes.dup.each do |attribute|
         @ar_instance.send("#{attribute}=", @synced_attributes[attribute])
-        @attributes.delete(attribute) unless @synced_attributes.has_key?(attribute)
+        @attributes.delete(attribute) unless @synced_attributes.key?(attribute)
       end
+      # as synced, attributes are taken out of @changed_attributes
       @changed_attributes = []
       @errors = nil
     end
